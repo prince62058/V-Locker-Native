@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+        <disable-keyguard-features />
+        <disable-camera />
+        <disable-usb-debugging />
+        <disable-usb-charge />
+        <disable-usb-storage />
+        <disable-usb-tethering />
+        <disable-dailer/>
+        <disable-voice-commands/>
+        <disable-voice-input/>
+        <disable-voice-output/>
+        <reset-password />
+        <limit-password /> 
+    </uses-policies>
+</device-admin>

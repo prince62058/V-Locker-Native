@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298653386817",
+    "project_id": "v-locker-38acd",
+    "storage_bucket": "v-locker-38acd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298653386817:android:d988853a4ab92a1fdd9ec0",
+        "android_client_info": {
+          "package_name": "com.vlocker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtDsMLjb383-qKbB5hzGlGb_FDJ8OrYIo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

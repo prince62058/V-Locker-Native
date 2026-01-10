@@ -1,0 +1,29 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/Rubik-Bold.ttf",
+      "sha1": "4aad5243cee047469b80f96a92714f2e88418785"
+    },
+    {
+      "path": "src/assets/fonts/Rubik-ExtraBold.ttf",
+      "sha1": "98cc0f956b0ef647c14d9103cfb8af317c4a9b18"
+    },
+    {
+      "path": "src/assets/fonts/Rubik-Light.ttf",
+      "sha1": "4e89f40b6b4938fd7e705960c74a0139ec12cae5"
+    },
+    {
+      "path": "src/assets/fonts/Rubik-Medium.ttf",
+      "sha1": "786b4465e48a9b0496800f1d607fd6d8fef8eb8c"
+    },
+    {
+      "path": "src/assets/fonts/Rubik-Regular.ttf",
+      "sha1": "01247a7ea5dcb29e28d5fb9f6feb3eb72a1bc3b2"
+    },
+    {
+      "path": "src/assets/fonts/Rubik-SemiBold.ttf",
+      "sha1": "3ba0f03e9880cad05eb919df2e2d0884ca9c9999"
+    }
+  ]
+}
