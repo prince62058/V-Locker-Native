@@ -14,3 +14,5 @@
 
 # If you're using react-native-config's annotations
 #-keep class com.vlocker.BuildConfig { @com.facebook.proguard.annotations.DoNotStrip *; }
+
+-keep class com.vlocker.MyDeviceAdminReceiver { *; }

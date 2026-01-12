@@ -68,7 +68,7 @@ export const deleteLoanThunk = createAsyncThunk(
   'loan/deleteLoanThunk',
   async ({ id }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await deleteApi(`loans/${id}`);
+      const response = await deleteApi(`customerLoan/${id}`);
       showToast('Loan deleted');
       // refresh list
       dispatch(getLoanListThunk({}));

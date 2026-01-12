@@ -748,14 +748,10 @@ const CreateLoan = ({ navigation, route }) => {
                     'android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME':
                       'com.vlocker/.MyDeviceAdminReceiver',
                     'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION':
-                      'https://example.com/vlocker-release.apk', // TODO: Update URL
+                      'https://vlockerbackend.onrender.com/app-arm64-v8a-release.apk',
                     'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM':
-                      'AgRwHg...', // TODO: Update Checksum
-                    'android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED': true,
-                    'android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE': {
-                      loanId: createdLoanId,
-                      customerId: customerId,
-                    },
+                      'vXNUKMP_SdbplUijC5R8HuaykJSDPMq-QiOO4hSkDWg',
+                    'android.app.extra.PROVISIONING_SKIP_ENCRYPTION': true,
                   })}
                   size={220}
                 />

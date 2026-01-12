@@ -137,6 +137,43 @@ const LoanInfo = ({ navigation, route }) => {
                     height: fontSize(50),
                   }}
                 />
+
+                <SubmitButton
+                  title="Delete Loan"
+                  onPress={() => {
+                    const { Alert } = require('react-native');
+                    Alert.alert(
+                      'Delete Loan',
+                      'Are you sure you want to delete this loan?',
+                      [
+                        {
+                          text: 'Cancel',
+                          style: 'cancel',
+                        },
+                        {
+                          text: 'Delete',
+                          onPress: async () => {
+                            const {
+                              deleteLoanThunk,
+                            } = require('../../../redux/slices/main/loanSlice');
+                            await dispatch(
+                              deleteLoanThunk({ id: loanDetails?._id }),
+                            );
+                            navigation.goBack();
+                          },
+                          style: 'destructive',
+                        },
+                      ],
+                    );
+                  }}
+                  mainStyle={{
+                    marginHorizontal: 0,
+                    width: '100%',
+                    marginTop: 10,
+                    height: fontSize(50),
+                    backgroundColor: COLORS.red, // Assuming COLORS.red exists, otherwise use '#FF0000'
+                  }}
+                />
               </View>
             </ScrollView>
 
