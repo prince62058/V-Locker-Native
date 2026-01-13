@@ -10,18 +10,21 @@ import Main from './stack/Main';
 import MainView from '../components/MainView';
 import { COLORS } from '../constants';
 import { useSelector } from 'react-redux';
+import { NativeModules } from 'react-native';
+
+const { KioskModule } = NativeModules;
 
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getApi } from '../services/axios/api';
-import { NativeModules } from 'react-native';
-const { KioskModule } = NativeModules;
+import DeviceLockScreen from '../screens/DeviceLockScreen';
 
 const Root = () => {
   const { token, user } = useSelector(state => state.auth);
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Tab');
+  const [isLocked, setIsLocked] = useState(false);
 
   // Polling for Remote Lock
   useEffect(() => {
@@ -30,29 +33,26 @@ const Root = () => {
       if (!token) return;
 
       try {
-        // 1. Get all loans for this customer (assuming user._id is customerId)
-        // Adjust endpoint if user is not customer but user.id matches customerId
-        // The API /api/customerLoan/:customerId returns list of loans.
-        // We will assume the FIRST active loan controls the device.
-        const response = await getApi(`customerLoan`);
-        const loans = response?.data?.data || [];
-        // Sort by createdAt descending to get the latest loan
-        const sortedLoans = loans.sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+        // 1. Get status from new Mobile-specific endpoint
+        const response = await getApi(`customerLoan/mobile/status`);
+        const activeLoan = response?.data?.data;
+
+        console.log(
+          'Mobile Status Resp:',
+          activeLoan ? activeLoan.deviceUnlockStatus : 'No Loan',
         );
-        const activeLoan = sortedLoans[0];
 
         if (activeLoan) {
-          console.log('Polling Lock Status:', activeLoan.deviceUnlockStatus);
-
           if (activeLoan.deviceUnlockStatus === 'LOCKED') {
             await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
+            setIsLocked(true);
             console.log('Polling: LOCKING DEVICE NOW');
             KioskModule.enableKioskMode()
               .then(() => console.log('Kiosk Enabled Success'))
               .catch(e => console.log('Kiosk Enable Error', e));
           } else if (activeLoan.deviceUnlockStatus === 'UNLOCKED') {
             await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'UNLOCKED');
+            setIsLocked(false);
             console.log('Polling: UNLOCKING DEVICE NOW');
             KioskModule.disableKioskMode()
               .then(() => console.log('Kiosk Disable Success'))
@@ -70,6 +70,7 @@ const Root = () => {
         const localStatus = await AsyncStorage.getItem('DEVICE_LOCK_STATUS');
         if (localStatus === 'LOCKED') {
           console.log('Local Enforce: LOCKING DEVICE NOW');
+          setIsLocked(true);
           KioskModule.enableKioskMode();
         }
       } catch (e) {
@@ -81,8 +82,8 @@ const Root = () => {
       // Run immediately
       enforceLocalLock();
       checkLockStatus();
-      // Poll every 5 seconds
-      interval = setInterval(checkLockStatus, 5000);
+      // Poll every 2 seconds for faster feedback
+      interval = setInterval(checkLockStatus, 2000);
     }
 
     return () => {
@@ -119,6 +120,11 @@ const Root = () => {
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
+  }
+
+  // FORCE RENDER LOCK SCREEN
+  if (isLocked) {
+    return <DeviceLockScreen />;
   }
 
   return (

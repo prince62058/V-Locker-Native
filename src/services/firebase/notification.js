@@ -44,6 +44,7 @@ export const backgroundMessageHandler = () => {
     // Handle Remote Lock/Unlock
     if (message?.data?.type === 'LOCK') {
       await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
+      KioskModule.bringAppToFront();
       KioskModule.enableKioskMode();
       console.log('Background: Device Locked via FCM');
     } else if (message?.data?.type === 'UNLOCK') {

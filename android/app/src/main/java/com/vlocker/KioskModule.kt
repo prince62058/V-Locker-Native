@@ -20,38 +20,73 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     @ReactMethod
     fun enableKioskMode(promise: Promise) {
+        android.util.Log.d("KioskModule", "enableKioskMode called")
         try {
             val activity = getCurrentActivity()
             if (activity == null) {
+                android.util.Log.e("KioskModule", "Activity is null")
                 promise.reject("NO_ACTIVITY", "Current activity is null")
                 return
             }
             
             if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
-                // Device Owner Status:
-                // An app set as Device Owner cannot be uninstalled by the user.
-                // This is the primary mechanism preventing uninstallation.
-
+                android.util.Log.d("KioskModule", "App is Device Owner. Setting restrictions...")
+                
                 // 1. Set Lock Task Packages (Allow only this app)
                 dpm.setLockTaskPackages(adminComponent, arrayOf(reactApplicationContext.packageName))
                 
-                // 2. Clear any existing PIN/Password automatically
+                // 2. Clear any existing PIN/Password
                 try {
                      dpm.resetPassword("", 0)
                 } catch (e: Exception) {
-                     // Log or ignore if already cleared or failed, but continue kiosk
+                     android.util.Log.e("KioskModule", "Failed to reset password: " + e.message)
                 }
 
-                // 3. Start Lock Task (Kiosk Mode)
-                // This locks the user into this specific app, preventing access to the Home screen or Settings,
-                // effectively blocking any route to attempt uninstallation or factory reset.
-                activity.startLockTask()
+                // 3. Disable Status Bar and Keyguard
+                dpm.setStatusBarDisabled(adminComponent, true)
+                dpm.setKeyguardDisabledFeatures(adminComponent, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL)
+                dpm.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
                 
-                promise.resolve(true)
+                // Add strict user restrictions
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CREATE_WINDOWS)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADJUST_VOLUME)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADD_USER)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_USB_FILE_TRANSFER)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
+
+                android.util.Log.d("KioskModule", "Restrictions set. Starting LockTask...")
+
+                // 4. Force Immersive Mode (Hide Nav Bar & Gestures)
+                activity.runOnUiThread {
+                    activity.window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                    // Start Lock Task
+                    try {
+                        activity.startLockTask()
+                        android.util.Log.d("KioskModule", "startLockTask executed")
+                        promise.resolve(true)
+                    } catch (e: Exception) {
+                        android.util.Log.e("KioskModule", "startLockTask FAILED: " + e.message)
+                        promise.reject("LOCK_ERROR", e.message)
+                    }
+                }
             } else {
+                android.util.Log.e("KioskModule", "App is NOT Device Owner")
                 promise.reject("NOT_OWNER", "App is not Device Owner")
             }
         } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Exception: " + e.message)
             promise.reject("ERROR", e.message)
         }
     }
@@ -70,6 +105,14 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                     // 1. Clear Global Restrictions that might affect UI
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CREATE_WINDOWS)
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADJUST_VOLUME)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADD_USER)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_USB_FILE_TRANSFER)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
+                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
                     
                     // 2. Set Lock Task Features to defaults
                     dpm.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
@@ -156,6 +199,25 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             }
         } catch (e: SecurityException) {
             promise.reject("SECURITY_ERROR", "Security Exception: " + e.message)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun bringAppToFront(promise: Promise) {
+        try {
+            val packageName = reactApplicationContext.packageName
+            val launchIntent = reactApplicationContext.packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                // launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) // Optional
+                launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                reactApplicationContext.startActivity(launchIntent)
+                promise.resolve(true)
+            } else {
+                promise.reject("ERROR", "Launch intent not found")
+            }
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
         }
