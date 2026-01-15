@@ -10,7 +10,7 @@ import Main from './stack/Main';
 import MainView from '../components/MainView';
 import { COLORS } from '../constants';
 import { useSelector } from 'react-redux';
-import { NativeModules } from 'react-native';
+import { NativeModules, DeviceEventEmitter } from 'react-native';
 
 const { KioskModule } = NativeModules;
 
@@ -105,6 +105,27 @@ const Root = () => {
       }
     };
     checkPin();
+  }, []);
+
+  // Listen for Instant Lock/Unlock Events from FCM
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'LOCK_STATUS_CHANGED',
+      async event => {
+        console.log('Event Emitter: Received LOCK_STATUS_CHANGED', event);
+        if (event.status === 'LOCKED') {
+          setIsLocked(true);
+          await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
+        } else if (event.status === 'UNLOCKED') {
+          setIsLocked(false);
+          await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'UNLOCKED');
+        }
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   if (isLoading) {

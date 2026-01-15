@@ -23,9 +23,25 @@ export async function getFcmToken() {
   }
 }
 
+import { DeviceEventEmitter } from 'react-native';
+
 export const foregroundMessage = () => {
   onMessage(messagingInstance, async message => {
     console.log('Foreground Message', message);
+
+    // Handle Remote Lock/Unlock in Foreground
+    if (message?.data?.type === 'LOCK') {
+      await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
+      KioskModule.enableKioskMode();
+      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' });
+      console.log('Foreground: Device Locked via FCM');
+    } else if (message?.data?.type === 'UNLOCK') {
+      await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'UNLOCKED');
+      KioskModule.disableKioskMode();
+      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
+      console.log('Foreground: Device Unlocked via FCM');
+    }
+
     if (message) {
       await createNotification(message);
     }
@@ -44,12 +60,14 @@ export const backgroundMessageHandler = () => {
     // Handle Remote Lock/Unlock
     if (message?.data?.type === 'LOCK') {
       await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
-      KioskModule.bringAppToFront();
+      KioskModule.bringAppToFront(); // Ensure app comes to front to show Red Screen
       KioskModule.enableKioskMode();
+      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' }); // Helpful if app was suspended but JS still runs
       console.log('Background: Device Locked via FCM');
     } else if (message?.data?.type === 'UNLOCK') {
       await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'UNLOCKED');
       KioskModule.disableKioskMode();
+      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
       console.log('Background: Device Unlocked via FCM');
     }
 
