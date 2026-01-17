@@ -1,99 +1,99 @@
-# V-Locker-Native
+# V-Locker Mobile App (React Native)
 
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+The V-Locker Mobile Application is designed for customers and dealers to manage device financing and security. It includes features for EMI tracking, device locking/unlocking (Kiosk Mode), and real-time notifications.
 
-# Getting Started
+## Features
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+- **Device Locking (Kiosk Mode)**: Secures financed devices, preventing unauthorized use if payments are missed. Includes `MyDeviceAdminReceiver` for admin privileges.
+- **EMI Dashboard**: View loan details, upcoming EMI dates, and payment history.
+- **Push Notifications**: Real-time alerts for loan updates and lock/unlock actions via Firebase Cloud Messaging (FCM).
+- **Secure Authentication**: Mobile OTP-based login for customers and employees.
+- **Offline Support**: Redux Persist ensures data availability offline.
 
-## Step 1: Start Metro
+## Tech Stack
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- **Framework**: React Native (v0.81)
+- **Language**: JavaScript / React
+- **State Management**: Redux Toolkit & React-Redux
+- **Navigation**: React Navigation (Bottom Tabs, Native Stack)
+- **Networking**: Axios
+- **Local Storage**: Async Storage & React Native Keychain (Secure)
+- **UI**: React Native Vector Icons, Linear Gradient, Lottie Animations
+- **Native Modules**: `react-native-device-info`, `react-native-permissions`
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Prerequisites
 
-```sh
-# Using npm
-npm start
+- Node.js (v18+)
+- Java JDK 17
+- Android Studio & Android SDK
+- React Native CLI
 
-# OR using Yarn
-yarn start
+## Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/satyakabiroffical/V-Locker-React-Native-Frontend-.git
+    cd V-Locker-React-Native-Frontend-
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+
+3.  **API Configuration:**
+    The API base URL is configured in `src/services/axios/api.js`.
+    
+    *   **For Development (Local)**:
+        Update the URL to your local backend IP:
+        ```javascript
+        baseURL: Platform.OS === 'android' 
+          ? 'http://192.168.1.X:5000/api/' 
+          : 'http://localhost:5000/api/'
+        ```
+
+    *   **For Production**:
+        Uncomment the production URL line:
+        ```javascript
+        baseURL: 'https://vlockerbackend.onrender.com/api/'
+        ```
+
+4.  **Run the application:**
+
+    *   **Android:**
+        ```bash
+        npm run android
+        # or
+        npx react-native run-android
+        ```
+
+    *   **Start Metro Bundler:**
+        ```bash
+        npm start
+        ```
+
+## Troubleshooting
+
+-   **Gradle Errors**: Ensure you are using JDK 17 (`java -version`).
+-   **App Not Installed**: Uninstall the old version completely before installing a new build (especially if signatures differ).
+-   **"Package Invalid"**: Ensure `android:testOnly="true"` is NOT present in `AndroidManifest.xml` for release builds.
+
+## Folder Structure
+
+```
+src/
+├── assets/          # Images, Fonts, Animations
+├── components/      # Reusable UI Components
+├── constants/       # App Constants (Colors, Strings)
+├── navigation/      # Stack & Tab Navigators
+├── redux/           # Redux Slices & Services
+├── screens/         # Application Screens (Main, Auth)
+├── services/        # API (Axios) & Firebase Config
+└── utils/           # Helper Functions
 ```
 
-## Step 2: Build and run your app
+## License
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Private
