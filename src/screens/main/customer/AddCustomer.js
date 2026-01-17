@@ -18,7 +18,10 @@ import MainView from '../../../components/MainView';
 import { FONTS, SIZES, COLORS } from '../../../constants';
 import { fontSize } from '../../../utils/fontSize';
 import { showToast } from '../../../utils/ToastAndroid';
-import { createCustomerThunk } from '../../../redux/slices/main/customerSlice';
+import {
+  sendCustomerOtpThunk,
+  createCustomerThunk,
+} from '../../../redux/slices/main/customerSlice';
 import { pickImage } from '../../../services/picker/cropImagePicker';
 
 const AddCustomer = ({ navigation }) => {
@@ -60,30 +63,24 @@ const AddCustomer = ({ navigation }) => {
 
   const handleCreatePress = async () => {
     if (!validate()) return;
+
     const payload = {
       customerName: form.name,
       customerMobileNumber: form.mobile,
       address: form.address,
-      profileUrl: form.profileUrl,
     };
-    const response = await dispatch(createCustomerThunk(payload));
-    if (createCustomerThunk.fulfilled.match(response)) {
-      navigation.navigate('CutomerList');
+
+    const response = await dispatch(sendCustomerOtpThunk(payload));
+    if (sendCustomerOtpThunk.fulfilled.match(response)) {
+      // showToast('OTP sent successfully'); // handled in thunk
+      navigation.navigate('VerifyCustomer', {
+        customerData: {
+          ...form,
+          // profileUrl might be an object { uri: ... } or string depending on picker
+        },
+      });
     }
   };
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('blur', () => {
-      setForm({
-        name: '',
-        mobile: '',
-        address: '',
-        profileUrl: '',
-      });
-      setError({});
-    });
-    return unsubscribe;
-  }, [navigation]);
 
   const handleImageSelect = async () => {
     const res = await pickImage();
@@ -104,7 +101,7 @@ const AddCustomer = ({ navigation }) => {
         >
           <MainText style={styles.title}>Add New Customer</MainText>
           <MainText style={styles.desc}>
-            Enter the customer’s name and mobile number to get started.
+            Enter the customer's name and mobile number to get started.
           </MainText>
 
           <Pressable style={styles.profileImage} onPress={handleImageSelect}>

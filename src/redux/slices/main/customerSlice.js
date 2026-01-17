@@ -48,6 +48,37 @@ export const getCustomerProfileThunk = createAsyncThunk(
   },
 );
 
+export const sendCustomerOtpThunk = createAsyncThunk(
+  'customer/sendCustomerOtpThunk',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await postApi(`customers/send-otp`, data);
+      console.log('send otp api response --->', response.data);
+      showToast('OTP sent successfully');
+      return response.data;
+    } catch (error) {
+      showToast(error);
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const verifyCustomerOtpThunk = createAsyncThunk(
+  'customer/verifyCustomerOtpThunk',
+  async (data, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await postApi(`customers/verify-and-create`, data);
+      console.log('verify otp api response --->', response.data);
+      showToast('Customer created successfully');
+      dispatch(getCustomerThunk({}));
+      return response.data?.data;
+    } catch (error) {
+      showToast(error);
+      return rejectWithValue(error);
+    }
+  },
+);
+
 export const createCustomerThunk = createAsyncThunk(
   'customer/createCustomerThunk',
   async (data, { rejectWithValue, dispatch }) => {
@@ -220,6 +251,28 @@ const customerSlice = createSlice({
           filter: false,
         };
 
+        state.error = action.payload;
+      })
+      .addCase(sendCustomerOtpThunk.pending, (state, action) => {
+        state.loading.loading = true;
+        state.error = null;
+      })
+      .addCase(sendCustomerOtpThunk.fulfilled, (state, action) => {
+        state.loading.loading = false;
+      })
+      .addCase(sendCustomerOtpThunk.rejected, (state, action) => {
+        state.loading.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(verifyCustomerOtpThunk.pending, (state, action) => {
+        state.loading.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyCustomerOtpThunk.fulfilled, (state, action) => {
+        state.loading.loading = false;
+      })
+      .addCase(verifyCustomerOtpThunk.rejected, (state, action) => {
+        state.loading.loading = false;
         state.error = action.payload;
       })
       .addCase(getCustomerProfileThunk.pending, (state, action) => {

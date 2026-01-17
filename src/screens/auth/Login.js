@@ -14,7 +14,7 @@ import Input from '../../components/common/input/Input';
 import MainText from '../../components/MainText';
 import MainView from '../../components/MainView';
 import { COLORS, FONTS, images, SIZES } from '../../constants';
-import { sendOtp } from '../../redux/slices/auth/authSlice';
+import { sendOtp, loginUser } from '../../redux/slices/auth/authSlice';
 import { fontSize } from '../../utils/fontSize';
 import { showToast } from '../../utils/ToastAndroid';
 
@@ -25,6 +25,25 @@ const Login = ({ navigation }) => {
 
   const [prefix, setPrefix] = useState('+91');
   const [number, setNumber] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async () => {
+    if (isAdmin) {
+      if (!email || !password) {
+        showToast('Please enter both email and password');
+        return;
+      }
+      const response = await dispatch(loginUser({ email, password }));
+      // Navigation handled by Redux state change (Root.js listens to token)
+      if (loginUser.rejected.match(response)) {
+        // showToast(response.payload || 'Login failed');
+      }
+    } else {
+      handleOtpPress();
+    }
+  };
 
   const validate = () => {
     if (number.trim() === '') {
@@ -63,31 +82,61 @@ const Login = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           <Image source={images.login} style={styles.images} />
-          <MainText style={styles.title}>Login to continue</MainText>
+          <MainText style={styles.title}>
+            {isAdmin ? 'Shop Employee Login' : 'Customer Login'}
+          </MainText>
           <MainText style={styles.desc}>
-            We Will send you an One Time Password to verify your number.
+            {isAdmin
+              ? 'Enter your credentials to access shop features.'
+              : 'we Will send you an One Time Password to verify your number.'}
           </MainText>
 
-          <Input
-            placeholder="Enter mobile number"
-            value={number}
-            onChangeText={setNumber}
-            maxLength={10}
-            keyboardAppearance={'dark'}
-            keyboardType={'numeric'}
-          />
+          {isAdmin ? (
+            <>
+              <Input
+                placeholder="Enter email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardAppearance={'dark'}
+                keyboardType={'email-address'}
+                autoCapitalize="none"
+                showPrefix={false}
+                icon="📧"
+              />
+              <Input
+                placeholder="Enter password"
+                value={password}
+                onChangeText={setPassword}
+                keyboardAppearance={'dark'}
+                secureTextEntry
+                showPrefix={false}
+                icon="🔒"
+              />
+            </>
+          ) : (
+            <Input
+              placeholder="Enter mobile number"
+              value={number}
+              onChangeText={setNumber}
+              maxLength={10}
+              keyboardAppearance={'dark'}
+              keyboardType={'numeric'}
+              icon="📱"
+            />
+          )}
 
           <SubmitButton
-            title="Get OTP"
-            onPress={handleOtpPress}
+            title={isAdmin ? 'Login' : 'Get OTP'}
+            onPress={handleLogin}
             mainStyle={styles.button}
             loading={loading}
           />
 
           <View style={styles.footer}>
-            <MainText>Don't have an account?</MainText>
-            <Pressable onPress={handleNavigation}>
-              <MainText style={styles.link}> Sign Up</MainText>
+            <Pressable onPress={() => setIsAdmin(!isAdmin)}>
+              <MainText style={styles.link}>
+                {isAdmin ? 'Customer Login' : 'Shop Employee Login'}
+              </MainText>
             </Pressable>
           </View>
         </ScrollView>
@@ -133,5 +182,9 @@ const styles = StyleSheet.create({
     color: COLORS.b1,
     fontFamily: FONTS.medium,
     fontSize: fontSize(15),
+  },
+  button: {
+    marginTop: SIZES.height * 0.03,
+    marginHorizontal: SIZES.width * 0.08,
   },
 });

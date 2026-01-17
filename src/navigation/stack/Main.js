@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CustomerAddress from '../../screens/main/customer/CustomerAddress';
 import CutomerList from '../../screens/main/customer/CutomerList';
+import VerifyCustomer from '../../screens/main/customer/VerifyCustomer';
 import ViewCustomer from '../../screens/main/customer/ViewCustomer';
 import DeviceList from '../../screens/main/devices/DeviceList';
 import Aadhar from '../../screens/main/kyc/Aadhar';
@@ -40,6 +41,7 @@ const Main = ({ initialRouteName = 'Tab' }) => {
       <Stack.Screen name="DeviceList" component={DeviceList} />
 
       <Stack.Screen name="CutomerList" component={CutomerList} />
+      <Stack.Screen name="VerifyCustomer" component={VerifyCustomer} />
       <Stack.Screen name="ViewCustomer" component={ViewCustomer} />
       <Stack.Screen name="CustomerAddress" component={CustomerAddress} />
       <Stack.Screen name="EditCustomer" component={EditCustomer} />

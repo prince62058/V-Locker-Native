@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import moment from 'moment';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import MainView from '../../../components/MainView';
 import CustomHeader from '../../../components/header/CustomHeader';
@@ -143,16 +144,27 @@ const LockDevices = () => {
     return () => backHandler.remove();
   }, [sheetOpen]);
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item, index }) => {
     // Map API data to Card props
     const cardItem = {
       ...item,
-      deviceName: item?.modelNo || 'Unknown Device', // Adjust field name based on actual API
-      dataStatus: item?.deviceStatus || 'Offline', // Adjust field name
-      name: item?.customerName || item?.customer?.customerName || 'Unknown',
-      phone: item?.mobileNumber || item?.customer?.customerMobileNumber || '',
-      loanId: item?.loanLimit || item?.loanId || 'N/A',
-      dueDate: item?.nextEmiDate || 'N/A',
+      ...item,
+      deviceName:
+        `${item?.mobileBrand || ''} ${item?.mobileModel || ''}`.trim() ||
+        'Unknown Device',
+      dataStatus:
+        item?.loanStatus === 'APPROVED'
+          ? 'Active'
+          : item?.loanStatus || 'Offline',
+      name: item?.customerId?.customerName || 'Unknown',
+      phone: item?.customerId?.customerMobileNumber || '',
+      loanId: index + 1,
+      dueDate: item?.nextEmiDetails?.dueDate
+        ? moment(item.nextEmiDetails.dueDate).format('DD MMM YYYY')
+        : 'N/A',
+      amountDue: item?.nextEmiDetails?.amount
+        ? `₹${item.nextEmiDetails.amount}`
+        : 'N/A',
       // frequency: item?.frequency || "Monthly",
       lockedStatus: item?.deviceUnlockStatus === 'LOCKED',
     };

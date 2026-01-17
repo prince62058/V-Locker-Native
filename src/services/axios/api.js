@@ -3,15 +3,15 @@ import { Platform } from 'react-native';
 import { getSecureItem } from '../storage/keychain';
 
 const api = axios.create({
-  // [MODIFIED] Using 10.0.2.2 for Android Emulator to access host localhost
+  // Using 10.0.2.2 for Android Emulator to access host localhost
   baseURL:
     Platform.OS === 'android'
       ? 'http://10.0.2.2:3000/api/'
       : 'http://localhost:3000/api/',
+  // Production URLs (commented out for development):
   // baseURL: 'https://v-locker.framekarts.com/api/',
   // baseURL: 'https://vlockerbackend.onrender.com/api/',
-  baseURL: 'http://192.168.29.138:3000/api/',
-  timeout: 5 * 1000,
+  timeout: 15 * 1000,
   headers: {
     'Content-Type': 'application/json',
   },

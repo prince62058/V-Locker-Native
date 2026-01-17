@@ -168,7 +168,7 @@ const Home = ({ navigation }) => {
             text={'Due Installments'}
             icon={icons.due}
             gradientColors={[COLORS.lg05, COLORS.lg15]}
-            onPress={() => navigation.navigate('')}
+            // onPress={() => navigation.navigate('')} // TODO: Implement Due Installments screen
           />
           <LoanCard
             text={'Bulk Lock/Unlock'}

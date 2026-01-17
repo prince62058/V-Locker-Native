@@ -7,7 +7,7 @@ import Seperator from '../common/seperator/Seperator';
 import ToggleButton from '../common/button/ToggleButton';
 
 const LockDeviceCard = ({ item, onPress }) => {
-  const status = item.dataStatus === 'Online';
+  const status = ['Online', 'Active'].includes(item.dataStatus);
 
   return (
     <View style={styles.container}>
@@ -69,7 +69,7 @@ const LockDeviceCard = ({ item, onPress }) => {
           <View style={[styles.flex, { justifyContent: 'flex-start' }]}>
             <MainText style={styles.redTitle}>Amount Due EMI</MainText>
           </View>
-          <MainText style={styles.date}>{item.dueDate}</MainText>
+          <MainText style={styles.date}>{item.amountDue}</MainText>
           <MainText style={styles.freq}>{item.frequency}</MainText>
         </View>
       </View>
