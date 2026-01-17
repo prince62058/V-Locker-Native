@@ -108,7 +108,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS)
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADJUST_VOLUME)
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET)
+                    // dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET) // Keep this restricted!
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADD_USER)
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_USB_FILE_TRANSFER)
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
