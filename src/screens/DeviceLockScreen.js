@@ -1,16 +1,22 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   BackHandler,
   Image,
-  Linking,
-  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import { getLoanListThunk } from '../redux/slices/main/loanSlice';
 
 const DeviceLockScreen = () => {
+  const dispatch = useDispatch();
+  const [emiAmount, setEmiAmount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { user } = useSelector(state => state.auth);
+
   // Disable Back Button
   useEffect(() => {
     const backAction = () => {
@@ -25,9 +31,29 @@ const DeviceLockScreen = () => {
     return () => backHandler.remove();
   }, []);
 
-  const openDialer = () => {
-    Linking.openURL('tel:+919876543210'); // Replace with actual support number
-  };
+  // Fetch EMI amount on mount
+  useEffect(() => {
+    const fetchLoanData = async () => {
+      try {
+        setLoading(true);
+        const result = await dispatch(
+          getLoanListThunk({ page: 1, limit: 1 }),
+        ).unwrap();
+
+        if (result?.data && result.data.length > 0) {
+          const loan = result.data[0];
+          // Extract EMI amount from loan data
+          setEmiAmount(loan.emiAmount || loan.monthlyEmi || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching loan data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLoanData();
+  }, [dispatch]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -38,6 +64,20 @@ const DeviceLockScreen = () => {
         <Text style={styles.title}>DEVICE LOCKED</Text>
         <Text style={styles.subtitle}>Please Pay Your EMI</Text>
 
+        {/* EMI Amount Display */}
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#B00020"
+            style={styles.loader}
+          />
+        ) : (
+          <View style={styles.emiContainer}>
+            <Text style={styles.emiLabel}>EMI Due Amount</Text>
+            <Text style={styles.emiAmount}>₹{emiAmount || '---'}</Text>
+          </View>
+        )}
+
         <View style={styles.warningBox}>
           <Text style={styles.warningText}>
             Your device has been locked because your EMI is OVERDUE. Please pay
@@ -45,14 +85,26 @@ const DeviceLockScreen = () => {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={openDialer}>
-          <Text style={styles.buttonText}>CONTACT SUPPORT</Text>
-        </TouchableOpacity>
+        {/* Payment QR Code */}
+        <View style={styles.qrContainer}>
+          <Image
+            source={require('../assets/images/payment_qr.jpg')}
+            style={styles.qrImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.qrText}>Scan to Pay EMI</Text>
+        </View>
+
+        {/* Customer Support Number (View Only) */}
+        <View style={styles.supportContainer}>
+          <Text style={styles.supportLabel}>Customer Support</Text>
+          <Text style={styles.supportNumber}>6205872519</Text>
+        </View>
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          ID: {Math.floor(Math.random() * 1000000)}
+          ID: {user?.customerId || Math.floor(Math.random() * 1000000)}
         </Text>
       </View>
     </SafeAreaView>
@@ -92,11 +144,35 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 20,
   },
+  loader: {
+    marginVertical: 20,
+  },
+  emiContainer: {
+    backgroundColor: '#FFE5E5',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 20,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#B00020',
+  },
+  emiLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  emiAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#B00020',
+  },
   warningBox: {
     backgroundColor: '#FFE5E5',
     padding: 15,
     borderRadius: 10,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   warningText: {
     fontSize: 14,
@@ -104,17 +180,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  button: {
-    backgroundColor: '#B00020',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    elevation: 5,
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  buttonText: {
-    color: '#fff',
+  qrImage: {
+    width: 200,
+    height: 200,
+    marginBottom: 10,
+  },
+  qrText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  supportContainer: {
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    width: '100%',
+  },
+  supportLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
+  },
+  supportNumber: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
+    letterSpacing: 1,
   },
   footer: {
     position: 'absolute',

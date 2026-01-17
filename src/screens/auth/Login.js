@@ -20,7 +20,7 @@ import { showToast } from '../../utils/ToastAndroid';
 
 const Login = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { token, user, loading } = useSelector(state => state.auth);
+  const { token, user } = useSelector(state => state.auth);
   // console.log('Auth State in Login Screen ---> ', {token, user, loading})
 
   const [prefix, setPrefix] = useState('+91');
@@ -28,6 +28,7 @@ const Login = ({ navigation }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [localLoading, setLocalLoading] = useState(false);
 
   const handleLogin = async () => {
     if (isAdmin) {
@@ -35,7 +36,9 @@ const Login = ({ navigation }) => {
         showToast('Please enter both email and password');
         return;
       }
+      setLocalLoading(true);
       const response = await dispatch(loginUser({ email, password }));
+      setLocalLoading(false);
       // Navigation handled by Redux state change (Root.js listens to token)
       if (loginUser.rejected.match(response)) {
         showToast(response.payload || 'Login failed');
@@ -59,8 +62,10 @@ const Login = ({ navigation }) => {
 
   const handleOtpPress = async () => {
     if (!validate()) return;
+    setLocalLoading(true);
     // Sending { type: 'login' } to tell backend to check if user exists
     const response = await dispatch(sendOtp({ phone: number, type: 'login' }));
+    setLocalLoading(false);
     if (sendOtp.fulfilled.match(response)) {
       navigation.navigate('Otp', { phone: number, prefix });
     } else {
@@ -129,7 +134,7 @@ const Login = ({ navigation }) => {
             title={isAdmin ? 'Login' : 'Get OTP'}
             onPress={handleLogin}
             mainStyle={styles.button}
-            loading={loading}
+            loading={localLoading}
           />
 
           <View style={styles.footer}>

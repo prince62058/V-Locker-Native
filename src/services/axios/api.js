@@ -4,12 +4,12 @@ import { getSecureItem } from '../storage/keychain';
 
 const api = axios.create({
   // Production URL - deployed backend on Render
-  baseURL: 'https://vlockerbackend.onrender.com/api/',
-  // baseURL:
-  //   Platform.OS === 'android'
-  //     ? 'http://10.0.2.2:3000/api/'
-  //     : 'http://localhost:3000/api/',
-  timeout: 15 * 1000,
+  // baseURL: 'https://vlockerbackend.onrender.com/api/',
+  baseURL:
+    Platform.OS === 'android'
+      ? 'http://10.0.2.2:3000/api/'
+      : 'http://localhost:3000/api/',
+  timeout: 5 * 1000,
   headers: {
     'Content-Type': 'application/json',
   },
