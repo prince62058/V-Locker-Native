@@ -179,6 +179,18 @@ export const getMobileModelThunk = createAsyncThunk(
   },
 );
 
+export const logoutThunk = createAsyncThunk(
+  'auth/logout',
+  async (_, { rejectWithValue }) => {
+    try {
+      await deleteSecureItem('USER_TOKEN');
+      return true;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -187,11 +199,16 @@ const authSlice = createSlice({
       state.token = null;
       state.user = null;
       state.error = null;
-      deleteSecureItem('USER_TOKEN');
     },
   },
   extraReducers: builder =>
     builder
+      .addCase(logoutThunk.fulfilled, state => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.error = null;
+      })
       .addCase(registerUser.pending, state => {
         state.loading = true;
         state.error = null;
