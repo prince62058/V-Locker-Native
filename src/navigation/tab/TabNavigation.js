@@ -64,12 +64,6 @@ const TabNavigation = () => {
           },
           lib: Ionicons,
         },
-        {
-          name: 'Profile',
-          component: Profile,
-          icons: { focused: 'person', unfocused: 'person-outline' },
-          lib: Ionicons,
-        },
       ];
   const TabBarButton = ({ children, onPress }) => (
     <TouchableOpacity onPress={onPress} activeOpacity={1} style={style.button}>
