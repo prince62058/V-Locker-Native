@@ -41,7 +41,7 @@ const UserDashboard = () => {
   };
 
   return (
-    <MainView>
+    <MainView transparent={false}>
       {/* Header with Logout Button */}
       <View style={styles.header}>
         <MainText style={styles.headerTitle}>My Dashboard</MainText>
