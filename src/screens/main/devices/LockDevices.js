@@ -4,6 +4,7 @@ import {
   RefreshControl,
   StyleSheet,
   View,
+  DeviceEventEmitter,
 } from 'react-native';
 import moment from 'moment';
 import React, { useCallback, useEffect, useRef, useState } from 'react';

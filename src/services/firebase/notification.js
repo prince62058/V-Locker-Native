@@ -40,6 +40,9 @@ export const foregroundMessage = () => {
       KioskModule.disableKioskMode();
       DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
       console.log('Foreground: Device Unlocked via FCM');
+    } else if (message?.data?.type === 'LOAN_UPDATE') {
+      DeviceEventEmitter.emit('LOAN_UPDATE', { message });
+      console.log('Foreground: Loan Updated via FCM');
     }
 
     if (message) {
@@ -69,6 +72,9 @@ export const backgroundMessageHandler = () => {
       KioskModule.disableKioskMode();
       DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
       console.log('Background: Device Unlocked via FCM');
+    } else if (message?.data?.type === 'LOAN_UPDATE') {
+      DeviceEventEmitter.emit('LOAN_UPDATE', { message });
+      console.log('Background: Loan Updated via FCM');
     }
 
     if (message?.messageId) {
