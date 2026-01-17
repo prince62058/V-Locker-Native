@@ -16,6 +16,8 @@ const Input = ({
   secureTextEntry = false,
   autoCapitalize,
   icon,
+  labelStyle,
+  inputContainerStyle,
 }) => {
   const handleChange = text => {
     // Only filter digits if it's a numeric keyboard (i.e., phone number input)
@@ -29,8 +31,8 @@ const Input = ({
 
   return (
     <View style={styles.container}>
-      <MainText style={styles.title}>{placeholder}</MainText>
-      <View style={styles.inputWrapper}>
+      <MainText style={[styles.title, labelStyle]}>{placeholder}</MainText>
+      <View style={[styles.inputWrapper, inputContainerStyle]}>
         {icon && <Text style={styles.icon}>{icon}</Text>}
         {showPrefix && <MainText style={styles.prefix}>+91 </MainText>}
         <TextInput

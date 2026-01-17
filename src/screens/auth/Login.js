@@ -106,7 +106,6 @@ const Login = ({ navigation }) => {
                 keyboardType={'email-address'}
                 autoCapitalize="none"
                 showPrefix={false}
-                icon="📧"
               />
               <Input
                 placeholder="Enter password"
@@ -115,7 +114,6 @@ const Login = ({ navigation }) => {
                 keyboardAppearance={'dark'}
                 secureTextEntry
                 showPrefix={false}
-                icon="🔒"
               />
             </>
           ) : (
@@ -126,7 +124,19 @@ const Login = ({ navigation }) => {
               maxLength={10}
               keyboardAppearance={'dark'}
               keyboardType={'numeric'}
-              icon="📱"
+              labelStyle={{
+                textAlign: 'center',
+                fontSize: fontSize(20),
+                marginBottom: 10,
+              }}
+              inputContainerStyle={{
+                borderWidth: 0,
+                borderBottomWidth: 1,
+                backgroundColor: 'transparent',
+                borderRadius: 0,
+                borderColor: COLORS.white,
+                paddingHorizontal: 0,
+              }}
             />
           )}
 
