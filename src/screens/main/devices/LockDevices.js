@@ -22,6 +22,8 @@ import { showToast } from '../../../utils/ToastAndroid';
 import {
   getLoanListThunk,
   updateLoanThunk,
+  lockDeviceThunk,
+  unlockDeviceThunk,
 } from '../../../redux/slices/main/loanSlice';
 
 const LockDevices = () => {
@@ -42,12 +44,30 @@ const LockDevices = () => {
   };
 
   const fetchData = useCallback(
-    ({ isRefresh = false }) => {
-      dispatch(
-        getLoanListThunk({ isRefresh, page: 1, limit: 100, search: search }),
-      );
+    ({ isRefresh = false, filters = {} }) => {
+      const apiParams = {
+        isRefresh,
+        page: 1,
+        limit: 100,
+        search: search,
+        ...filters,
+      };
+
+      // If explicit filters are missing from args, re-apply current selected filters
+      if (Object.keys(filters).length === 0 && selectedFilterValue.length > 0) {
+        if (selectedFilterValue.includes('LOCKED'))
+          apiParams.lockedDevices = true;
+        if (selectedFilterValue.includes('UNLOCKED'))
+          apiParams.unlockDevices = true;
+        if (selectedFilterValue.includes('ONLINE'))
+          apiParams.runningDevice = true;
+        if (selectedFilterValue.includes('OFFLINE'))
+          apiParams.notActiveDevices = true;
+      }
+
+      dispatch(getLoanListThunk(apiParams));
     },
-    [dispatch, search],
+    [dispatch, search, selectedFilterValue],
   );
 
   useEffect(() => {
@@ -69,12 +89,13 @@ const LockDevices = () => {
 
     try {
       await dispatch(
-        updateLoanThunk({
-          id: selectedItem._id,
-          data: {
-            deviceUnlockStatus: newStatus,
-          },
-        }),
+        newStatus === 'LOCKED'
+          ? lockDeviceThunk({
+              loanId: selectedItem._id,
+            })
+          : unlockDeviceThunk({
+              loanId: selectedItem._id,
+            }),
       ).unwrap();
 
       showToast(
@@ -111,9 +132,22 @@ const LockDevices = () => {
 
   const handleFilter = () => {
     if (selectedFilterValue?.length < 1) {
-      showToast('Select atleast one filter value');
+      // If cleared, just fetch default
+      handleDismiss(filterSheetRef);
+      fetchData({ isRefresh: true, filters: {} });
+      return;
     }
-    console.log('first', selectedFilterValue);
+
+    const filters = {};
+    if (selectedFilterValue.includes('LOCKED')) filters.lockedDevices = true;
+    if (selectedFilterValue.includes('UNLOCKED')) filters.unlockDevices = true;
+    if (selectedFilterValue.includes('ONLINE')) filters.runningDevice = true;
+    if (selectedFilterValue.includes('OFFLINE'))
+      filters.notActiveDevices = true;
+
+    console.log('applying filters', filters);
+    handleDismiss(filterSheetRef);
+    fetchData({ isRefresh: true, filters });
   };
 
   const filterSheetRef = useRef(null);

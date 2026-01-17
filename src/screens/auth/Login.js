@@ -38,7 +38,7 @@ const Login = ({ navigation }) => {
       const response = await dispatch(loginUser({ email, password }));
       // Navigation handled by Redux state change (Root.js listens to token)
       if (loginUser.rejected.match(response)) {
-        // showToast(response.payload || 'Login failed');
+        showToast(response.payload || 'Login failed');
       }
     } else {
       handleOtpPress();
@@ -64,7 +64,7 @@ const Login = ({ navigation }) => {
     if (sendOtp.fulfilled.match(response)) {
       navigation.navigate('Otp', { phone: number, prefix });
     } else {
-      // showToast(response?.payload?.message || 'Failed to send OTP')
+      showToast(response?.payload?.message || 'Failed to send OTP');
     }
   };
 

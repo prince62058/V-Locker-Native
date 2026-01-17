@@ -11,13 +11,10 @@ import { showToast } from '../../../utils/ToastAndroid';
 export const getLoanListThunk = createAsyncThunk(
   'loan/getLoanListThunk',
   async (
-    { isRefresh = false, page = 1, search = '', limit = 10, filter } = {},
+    { isRefresh = false, page = 1, search = '', limit = 10, ...rest } = {},
     { rejectWithValue },
   ) => {
-    const params = { page, limit, search };
-    if (filter) {
-      params[filter] = true;
-    }
+    const params = { page, limit, search, ...rest };
     console.log('device params', params);
     try {
       const response = await getApi('customerLoan', { params });
@@ -90,6 +87,44 @@ export const createLoanRecordThunk = createAsyncThunk(
       dispatch(getLoanListThunk({}));
       return created;
     } catch (error) {
+      showToast(error);
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const lockDeviceThunk = createAsyncThunk(
+  'loan/lockDeviceThunk',
+  async ({ loanId }, { dispatch, rejectWithValue }) => {
+    try {
+      console.log('Dispatching lock for loanId:', loanId);
+      const response = await postApi(`customerLoan/lock/${loanId}`);
+      console.log('Lock Device Response:', response.data);
+      // refresh list and details
+      dispatch(getLoanListThunk({}));
+      dispatch(getLoanDetailsThunk({ loanId }));
+      return response.data;
+    } catch (error) {
+      console.error('Lock Device Error:', error);
+      showToast(error);
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const unlockDeviceThunk = createAsyncThunk(
+  'loan/unlockDeviceThunk',
+  async ({ loanId }, { dispatch, rejectWithValue }) => {
+    try {
+      console.log('Dispatching unlock for loanId:', loanId);
+      const response = await postApi(`customerLoan/unlock/${loanId}`);
+      console.log('Unlock Device Response:', response.data);
+      // refresh list and details
+      dispatch(getLoanListThunk({}));
+      dispatch(getLoanDetailsThunk({ loanId }));
+      return response.data;
+    } catch (error) {
+      console.error('Unlock Device Error:', error);
       showToast(error);
       return rejectWithValue(error);
     }
@@ -259,6 +294,32 @@ const loanSlice = createSlice({
         state.loading.loading = false;
       })
       .addCase(createLoanRecordThunk.rejected, (state, action) => {
+        state.loading.loading = false;
+        state.error = action.payload;
+      })
+
+      // ---- lockDeviceThunk ----
+      .addCase(lockDeviceThunk.pending, state => {
+        state.loading.loading = true;
+        state.error = null;
+      })
+      .addCase(lockDeviceThunk.fulfilled, state => {
+        state.loading.loading = false;
+      })
+      .addCase(lockDeviceThunk.rejected, (state, action) => {
+        state.loading.loading = false;
+        state.error = action.payload;
+      })
+
+      // ---- unlockDeviceThunk ----
+      .addCase(unlockDeviceThunk.pending, state => {
+        state.loading.loading = true;
+        state.error = null;
+      })
+      .addCase(unlockDeviceThunk.fulfilled, state => {
+        state.loading.loading = false;
+      })
+      .addCase(unlockDeviceThunk.rejected, (state, action) => {
         state.loading.loading = false;
         state.error = action.payload;
       });
