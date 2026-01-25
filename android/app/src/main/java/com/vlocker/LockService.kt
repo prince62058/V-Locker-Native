@@ -112,7 +112,7 @@ class LockService : Service() {
                 // Make API call
                 // Make API call
                 val isEmulator = isEmulator()
-                var apiUrl = "http://10.0.2.2:3000/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
+                var apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
                 
                 if (isEmulator) {
                     apiUrl += "&phone=6205872519"

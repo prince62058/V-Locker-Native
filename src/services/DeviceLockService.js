@@ -43,7 +43,7 @@ const checkLockStatus = async () => {
 
     // 3. Network Check
     // Using a direct fetch for maximum robustness independent of app state
-    const API_URL = 'http://10.0.2.2:3000/api';
+    const API_URL = 'https://vlockerbackend.onrender.com/api';
 
     // We add a timestamp to avoid caching issues if any
     const response = await fetch(

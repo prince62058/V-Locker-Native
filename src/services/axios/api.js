@@ -7,10 +7,12 @@ const api = axios.create({
   // baseURL: 'https://v-locker.framekarts.com/api/',
 
   // Local Development URLs (uncomment for local testing)
-  baseURL:
-    Platform.OS === 'android'
-      ? 'http://10.0.2.2:3000/api/'
-      : 'http://localhost:3000/api/',
+  baseURL: 'https://vlockerbackend.onrender.com/api/',
+  // Local Development URLs (uncomment for local testing)
+  // baseURL:
+  //   Platform.OS === 'android'
+  //     ? 'http://10.0.2.2:3000/api/'
+  //     : 'http://localhost:3000/api/',
   timeout: 30 * 1000,
   headers: {
     'Content-Type': 'application/json',
