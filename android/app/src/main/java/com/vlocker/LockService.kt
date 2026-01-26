@@ -195,12 +195,27 @@ class LockService : Service() {
     }
 
     private fun getDeviceIdentifier(): String {
-        // For emulator testing, use hardcoded IMEI
-        return "867400022047199"
-        
-        // For production, use actual device ID:
-        // val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-        // return telephonyManager?.imei ?: android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+        return try {
+            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+            val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    telephonyManager?.imei 
+                } catch (e: SecurityException) {
+                    null
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                try {
+                    telephonyManager?.deviceId
+                } catch (e: SecurityException) {
+                    null
+                }
+            }
+            
+            imei ?: Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+        } catch (e: Exception) {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+        }
     }
 
     private fun enableKioskMode() {

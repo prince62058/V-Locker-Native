@@ -45,7 +45,7 @@ const checkLockStatus = async () => {
 
     // We add a timestamp to avoid caching issues if any
     const response = await fetch(
-      `${API_URL}/customerLoan/status/public?imei=${imei}&phone=6205872519&t=${Date.now()}`,
+      `${API_URL}/customerLoan/status/public?imei=${imei}&t=${Date.now()}`,
     );
     const data = await response.json();
 
