@@ -114,6 +114,24 @@ const checkLockStatus = async () => {
 
           // Force Enable Developer Options (Optional, but safe redundant check)
           await KioskModule.setDeveloperOptionsAllowed(true);
+
+          // Handle App Blocks (WhatsApp, YouTube, etc.)
+          const appBlocks = [
+            { key: 'isWhatsAppBlocked', package: 'com.whatsapp' },
+            { key: 'isInstagramBlocked', package: 'com.instagram.android' },
+            { key: 'isSnapchatBlocked', package: 'com.snapchat.android' },
+            { key: 'isYouTubeBlocked', package: 'com.google.android.youtube' },
+            { key: 'isFacebookBlocked', package: 'com.facebook.katana' },
+          ];
+
+          for (const app of appBlocks) {
+            if (data.policy.hasOwnProperty(app.key)) {
+              await KioskModule.setApplicationHidden(
+                app.package,
+                !!data.policy[app.key],
+              );
+            }
+          }
         } catch (policyError) {
           console.warn(
             'Device Policy Error (App might not be Device Owner or Activity Null):',

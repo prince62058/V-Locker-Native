@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { NativeModules } from 'react-native';
 import {
   StyleSheet,
   Text,
@@ -37,6 +38,21 @@ const Otp = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const { token, user, loading } = useSelector(state => state.auth);
   // console.log('Auth State in Login Screen ---> ', {token, user, loading})
+  const { KioskModule } = NativeModules;
+  const [imei, setImei] = useState('');
+
+  useEffect(() => {
+    const fetchImei = async () => {
+      try {
+        const deviceImei = await KioskModule.getDeviceImei();
+        console.log('Fetched IMEI during Login:', deviceImei);
+        setImei(deviceImei);
+      } catch (error) {
+        console.warn('Failed to fetch IMEI for login binding:', error);
+      }
+    };
+    fetchImei();
+  }, []);
 
   const [otp, setOtp] = useState(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -122,6 +138,7 @@ const Otp = ({ navigation, route }) => {
         phone: paramsData?.phone,
         otpCode: otp.join(''),
         isCustomer: paramsData?.isCustomer,
+        imei: imei, // Send captured IMEI
       }),
     );
 
