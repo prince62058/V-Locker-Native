@@ -13,8 +13,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.UserManager
 import android.util.Log
 import android.content.pm.ServiceInfo
+import android.net.wifi.WifiManager
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -53,22 +56,20 @@ class LockService : Service() {
                         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
                     }
                     
-                    // Force Enable Developer Options and ADB by default
+                    // Enforce Data protection and App control protection
                     try {
-                        dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
-                        dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.ADB_ENABLED, "1")
-                        dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, "1")
-                        Log.d("LockService", "Forced Developer Options & ADB Enabled")
+                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS)
+                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_WIFI)
+                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_AIRPLANE_MODE)
+                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_APPS_CONTROL)
+                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_UNINSTALL_APPS)
                         
-                        // Enforce Data protection and App control protection
-                        dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS)
-                        dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
-                        dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_AIRPLANE_MODE)
-                        dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_APPS_CONTROL)
-                        // dpm.setControlDisabledPackages(adminComponent, arrayOf(packageName))
-                        Log.d("LockService", "Data protection and App control restrictions enforced")
+                        // Prevent V-Locker from being force-stopped or data cleared
+                        dpm.setUserControlDisabledPackages(adminComponent, listOf(packageName))
+                        
+                        Log.d("LockService", "Strict device protection enforced")
                     } catch (e: Exception) {
-                        Log.e("LockService", "Failed to force enable dev options: ${e.message}")
+                        Log.e("LockService", "Failed to enforce restrictions: ${e.message}")
                     }
                 } else {
                     startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -96,6 +97,7 @@ class LockService : Service() {
             override fun run() {
                 if (isRunning) {
                     checkLockStatus()
+                    ensureNetworkHealth()
                     handler.postDelayed(this, CHECK_INTERVAL)
                 }
             }
@@ -110,13 +112,7 @@ class LockService : Service() {
                 Log.d("LockService", "Checking lock status for device: $deviceId")
 
                 // Make API call
-                // Make API call
-                val isEmulator = isEmulator()
-                var apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
-                
-                if (isEmulator) {
-                    apiUrl += "&phone=6205872519"
-                }
+                val apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
 
                 val url = URL(apiUrl)
                 val connection = url.openConnection() as HttpURLConnection
@@ -173,6 +169,29 @@ class LockService : Service() {
                 Log.e("LockService", "Error checking lock status: ${e.message}")
             }
         }.start()
+    }
+
+    private fun ensureNetworkHealth() {
+        try {
+            if (!dpm.isDeviceOwnerApp(packageName)) return
+
+            // 1. Force Airplane Mode OFF
+            val isAirplaneModeOn = Settings.Global.getInt(contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+            if (isAirplaneModeOn) {
+                Log.d("LockService", "Airplane Mode detected ON, forcing OFF")
+                dpm.setGlobalSetting(adminComponent, Settings.Global.AIRPLANE_MODE_ON, "0")
+            }
+
+            // 2. Force Wi-Fi ON (if possible/needed)
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (!wifiManager.isWifiEnabled) {
+                Log.d("LockService", "Wi-Fi detected OFF, forcing ON")
+                @Suppress("DEPRECATION")
+                wifiManager.isWifiEnabled = true
+            }
+        } catch (e: Exception) {
+            Log.e("LockService", "Error ensuring network health: ${e.message}")
+        }
     }
 
     private fun getDeviceIdentifier(): String {
@@ -267,17 +286,16 @@ class LockService : Service() {
             }
 
             if (policy.has("isDeveloperOptionsBlocked")) {
-                // Force unblock developer options for development/testing
-                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
-                
-                /* Original logic preserved for reference but disabled:
                 val blocked = policy.getBoolean("isDeveloperOptionsBlocked")
                 if (blocked) {
                     dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.ADB_ENABLED, "0")
                 } else {
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.ADB_ENABLED, "1")
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, "1")
                 }
-                */
+                Log.d("LockService", "Developer Options Blocked: $blocked")
             }
 
             Log.d("LockService", "Policies applied")

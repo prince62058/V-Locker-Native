@@ -20,11 +20,9 @@ const checkLockStatus = async () => {
     }
     console.log('Checking Lock Status for ID (Public):', imei);
 
-    // FOR DEBUGGING ONLY: Force IMEI to match the loan created by user
-    // if (__DEV__) {
-    imei = '867400022047199';
-    console.log(`[DEBUG] FORCED Emulator IMEI to: ${imei}`);
-    // }
+    // FOR DEBUGGING ONLY: Remove hardcoded IMEI
+    // imei = '867400022047199';
+    // console.log(`[DEBUG] FORCED Emulator IMEI to: ${imei}`);
 
     // 2. Initial Offline Check (Fast Lock)
     // If we haven't checked yet (e.g. app just started), verify local storage first
@@ -72,7 +70,8 @@ const checkLockStatus = async () => {
         }
 
         DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' }); // Emit event
-      } else if (data.status === 'UNLOCKED') {
+      } else {
+        // Explicitly UNLOCKED or fallback for no active loan/loan not approved
         // Update Local State
         if (localStatus !== 'UNLOCKED') {
           await AsyncStorage.setItem(LOCK_STATUS_KEY, 'UNLOCKED');
@@ -137,9 +136,37 @@ const POLLING_INTERVAL = 5 * 1000; // Reduced to 5 seconds for faster updates
 
 let intervalId = null;
 
-const startLockService = () => {
+const startLockService = async userRole => {
+  // 1. If Admin/Financer logs in, we MUST stop everything regardless of intervalId state
+  if (userRole === 'admin' || userRole === 'financer') {
+    console.log(
+      'Admin/Financer logged in. Ensuring all lock services are STOPPED.',
+    );
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    try {
+      await KioskModule.stopBackgroundLockService();
+      await KioskModule.disableKioskMode();
+      await AsyncStorage.setItem(LOCK_STATUS_KEY, 'UNLOCKED');
+      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
+    } catch (e) {
+      console.warn('Error stopping services for admin bypass:', e);
+    }
+    return;
+  }
+
+  // 2. For non-admins, if service is already running, no need to restart
   if (intervalId) return;
+
   console.log('Starting Device Lock Service...');
+  try {
+    await KioskModule.startBackgroundLockService();
+  } catch (e) {
+    console.warn('Error starting native service:', e);
+  }
+
   checkOverlayPermission(); // Ensure we have permissions for background popups
   checkLockStatus(); // Initial check
   intervalId = setInterval(checkLockStatus, POLLING_INTERVAL);

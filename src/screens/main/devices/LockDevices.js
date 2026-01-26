@@ -172,10 +172,11 @@ const LockDevices = () => {
     const mergedPolicy = { ...currentPolicy };
 
     // Update specific field
-    if (type === 'DEV_MODE') mergedPolicy.isDeveloperOptionsBlocked = !value;
+    if (type === 'DEV_MODE') mergedPolicy.isDeveloperOptionsBlocked = value;
     if (type === 'RESET') mergedPolicy.isResetAllowed = value;
     if (type === 'UNINSTALL') mergedPolicy.isUninstallAllowed = value;
     if (type === 'WALLPAPER') mergedPolicy.isWallpaperEnabled = value;
+    if (type === 'WALLPAPER_URL') mergedPolicy.wallpaperUrl = value;
     if (type === 'WHATSAPP') mergedPolicy.isWhatsAppBlocked = value;
     if (type === 'INSTAGRAM') mergedPolicy.isInstagramBlocked = value;
     if (type === 'SNAPCHAT') mergedPolicy.isSnapchatBlocked = value;

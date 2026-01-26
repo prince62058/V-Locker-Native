@@ -84,12 +84,12 @@ const Root = () => {
   // Polling for Remote Lock
   useEffect(() => {
     // Start the robust Lock Service
-    DeviceLockService.startLockService();
+    DeviceLockService.startLockService(user?.role);
 
     return () => {
       DeviceLockService.stopLockService();
     };
-  }, []); // Run once on mount
+  }, [user?.role]); // Run on mount and when role changes
 
   useEffect(() => {
     const checkPin = async () => {

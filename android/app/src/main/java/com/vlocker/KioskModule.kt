@@ -364,8 +364,11 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
                 if (allowed) {
                     dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.ADB_ENABLED, "1")
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, "1")
                 } else {
                     dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    dpm.setGlobalSetting(adminComponent, android.provider.Settings.Global.ADB_ENABLED, "0")
                 }
                 promise.resolve(true)
             } else {
@@ -419,26 +422,28 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
         }
-        @ReactMethod
-    fun updateWallpaper(isEnabled: Boolean, url: String, promise: Promise) {
+    }
+
+    @ReactMethod
+    fun startBackgroundLockService(promise: Promise) {
         try {
-            val intent = Intent(reactApplicationContext, WallpaperService::class.java)
-            if (isEnabled && url.isNotEmpty()) {
-                intent.putExtra("wallpaperUrl", url)
-                intent.putExtra("isEnabled", true)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    reactApplicationContext.startForegroundService(intent)
-                } else {
-                    reactApplicationContext.startService(intent)
-                }
+            val intent = Intent(reactApplicationContext, LockService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                reactApplicationContext.startForegroundService(intent)
             } else {
-                intent.action = "STOP_SERVICE"
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    reactApplicationContext.startForegroundService(intent)
-                } else {
-                    reactApplicationContext.startService(intent)
-                }
+                reactApplicationContext.startService(intent)
             }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun stopBackgroundLockService(promise: Promise) {
+        try {
+            val intent = Intent(reactApplicationContext, LockService::class.java)
+            reactApplicationContext.stopService(intent)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)

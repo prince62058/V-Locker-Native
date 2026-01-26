@@ -5,13 +5,16 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import MainText from '../MainText';
 import { COLORS, FONTS, SIZES } from '../../constants';
 import { fontSize } from '../../utils/fontSize';
 import SubmitButton from '../common/button/SubmitButton';
 import ToggleButton from '../common/button/ToggleButton';
+import { pickImage } from '../../services/picker/cropImagePicker';
+import { postMediaApi } from '../../services/axios/api';
 
 const DeviceLockModal = ({
   visible = false,
@@ -21,11 +24,31 @@ const DeviceLockModal = ({
   item = {},
   selectedItems = [], // New prop for bulk
 }) => {
+  const [uploadingStatus, setUploadingStatus] = useState(false);
+
   const isBulk = selectedItems.length > 1;
   const displayItem = isBulk ? selectedItems[0] : item;
   const isLocked = displayItem?.deviceUnlockStatus === 'LOCKED';
   const textValue = isLocked ? 'Unlock' : 'Lock';
   const policy = displayItem?.devicePolicy || {};
+
+  const handleWallpaperUpload = async () => {
+    try {
+      const image = await pickImage();
+      if (!image) return;
+
+      setUploadingStatus(true);
+      const res = await postMediaApi('upload', { file: image });
+      console.log('Upload success:', res.data);
+
+      const imageUrl = `https://vlockerbackend.onrender.com/${res.data.filePath}`;
+      onUpdate('WALLPAPER_URL', imageUrl);
+    } catch (error) {
+      console.error('Wallpaper upload error:', error);
+    } finally {
+      setUploadingStatus(false);
+    }
+  };
 
   return (
     <Modal
@@ -69,9 +92,7 @@ const DeviceLockModal = ({
                 title="UNLOCKED"
               />
             </View>
-
             <View style={styles.divider} />
-
             {/* Existing Policies */}
             <View style={styles.row}>
               <View>
@@ -84,7 +105,6 @@ const DeviceLockModal = ({
                 title="Blocked"
               />
             </View>
-
             <View style={styles.row}>
               <View>
                 <MainText style={styles.label}>Uninstall App</MainText>
@@ -98,7 +118,6 @@ const DeviceLockModal = ({
                 title="Blocked"
               />
             </View>
-
             <View style={styles.row}>
               <View>
                 <MainText style={styles.label}>Developer Mode</MainText>
@@ -115,10 +134,8 @@ const DeviceLockModal = ({
                 title="Blocked"
               />
             </View>
-
             <View style={styles.divider} />
             <MainText style={styles.sectionHeader}>App Restrictions</MainText>
-
             {[
               { id: 'WHATSAPP', label: 'WhatsApp', key: 'isWhatsAppBlocked' },
               {
@@ -150,6 +167,38 @@ const DeviceLockModal = ({
                 />
               </View>
             ))}
+            <View style={styles.divider} />
+            <MainText style={styles.sectionHeader}>Remote Wallpaper</MainText>
+            <View style={styles.row}>
+              <View>
+                <MainText style={styles.label}>Enable Wallpaper</MainText>
+              </View>
+              <ToggleButton
+                value={policy.isWallpaperEnabled || false}
+                onPress={() =>
+                  onUpdate('WALLPAPER', !(policy.isWallpaperEnabled || false))
+                }
+                activeTitle="Enabled"
+                title="Disabled"
+              />
+            </View>
+            {policy.isWallpaperEnabled && (
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <MainText style={styles.label}>Custom Wallpaper</MainText>
+                  <MainText style={styles.sublabel} numberOfLines={1}>
+                    {policy.wallpaperUrl || 'No image uploaded'}
+                  </MainText>
+                </View>
+                <SubmitButton
+                  title={uploadingStatus ? '...' : 'Upload'}
+                  onPress={handleWallpaperUpload}
+                  mainStyle={styles.uploadBtn}
+                  textStyle={{ fontSize: fontSize(12) }}
+                  disabled={uploadingStatus}
+                />
+              </View>
+            )}
           </ScrollView>
 
           <SubmitButton
@@ -231,5 +280,12 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: COLORS.red,
     marginHorizontal: 0,
+  },
+  uploadBtn: {
+    width: 80,
+    height: 35,
+    marginHorizontal: 0,
+    marginTop: 0,
+    backgroundColor: COLORS.primary,
   },
 });
