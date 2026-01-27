@@ -24,6 +24,8 @@ import { showToast } from '../../../utils/ToastAndroid';
 import { fontSize } from '../../../utils/fontSize';
 import { dateFormate } from '../../../utils/formating/date';
 
+import { MEDIA_BASE_URL } from '../../../services/axios/api';
+
 const EditProfile = ({ navigation }) => {
   const dispatch = useDispatch();
   const { user, loading } = useSelector(state => state.auth);
@@ -89,6 +91,13 @@ const EditProfile = ({ navigation }) => {
       }
     });
 
+    // WORKAROUND: The backend validation requires at least one text field (name, email, etc.)
+    // to be present in the body, otherwise it throws "value must contain at least one of...".
+    // If we only update the image, req.body might be empty.
+    if (updatedData.profileUrl && !updatedData.name) {
+      updatedData.name = form.name;
+    }
+
     if (Object.keys(updatedData).length === 0) {
       showToast('No changes to update');
       return;
@@ -100,6 +109,11 @@ const EditProfile = ({ navigation }) => {
     if (updateProfile.fulfilled.match(response)) {
       showToast('Profile updated successfully');
       navigation.goBack();
+    } else {
+      const errorMsg =
+        response?.payload || response?.error?.message || 'Update failed';
+      console.log('Update profile failed:', errorMsg);
+      showToast(typeof errorMsg === 'string' ? errorMsg : 'Update failed');
     }
   };
 
@@ -122,6 +136,21 @@ const EditProfile = ({ navigation }) => {
     };
   }, []);
 
+  const getProfileUri = () => {
+    if (!form.profileUrl) return null;
+    if (typeof form.profileUrl === 'object' && form.profileUrl.uri) {
+      return form.profileUrl.uri;
+    }
+    if (typeof form.profileUrl === 'string') {
+      if (form.profileUrl.startsWith('http')) return form.profileUrl;
+      const cleanPath = form.profileUrl.startsWith('/')
+        ? form.profileUrl.substring(1)
+        : form.profileUrl;
+      return `${MEDIA_BASE_URL}/${cleanPath}?t=${new Date().getTime()}`;
+    }
+    return null;
+  };
+
   return (
     <MainView transparent={false}>
       <CustomHeader title="Edit Profile" back />
@@ -141,7 +170,7 @@ const EditProfile = ({ navigation }) => {
           <Pressable style={styles.profileImage} onPress={handleImageSelect}>
             {form.profileUrl && (
               <Image
-                source={{ uri: form.profileUrl?.uri || form?.profileUrl }}
+                source={{ uri: getProfileUri() }}
                 style={{ width: '100%', height: '100%', borderRadius: 100 }}
               />
             )}

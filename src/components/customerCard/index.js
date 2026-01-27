@@ -12,6 +12,8 @@ import { COLORS, FONTS, SIZES, icons, images } from '../../constants';
 import { fontSize } from '../../utils/fontSize';
 import { getStatusStyle } from '../../utils/getStyle';
 
+import { MEDIA_BASE_URL } from '../../services/axios/api';
+
 const CustomerCard = ({
   id,
   name,
@@ -37,6 +39,21 @@ const CustomerCard = ({
     if (phone) Linking.openURL(`whatsapp://send?phone=${phone}`);
   };
 
+  const getProfileUrl = () => {
+    if (!profile) return null;
+    if (typeof profile === 'object' && profile.uri) return profile.uri;
+    if (typeof profile === 'string') {
+      if (profile.startsWith('http')) return profile;
+      const cleanPath = profile.startsWith('/')
+        ? profile.substring(1)
+        : profile;
+      return `${MEDIA_BASE_URL}/${cleanPath}?t=${new Date().getTime()}`;
+    }
+    return null;
+  };
+
+  const profileUri = getProfileUrl();
+
   return (
     <Pressable style={styles.customView} onPress={onEdit}>
       {/* <View style={styles.statusContainer}>
@@ -54,7 +71,7 @@ const CustomerCard = ({
         <View>
           <Image
             style={styles.profile}
-            source={profile ? { uri: profile } : images.userProfile}
+            source={profileUri ? { uri: profileUri } : images.userProfile}
           />
           <Pressable style={styles.editView} onPress={onEdit}>
             <Image style={styles.editIcon} source={icons.edit} />

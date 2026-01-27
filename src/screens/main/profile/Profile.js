@@ -10,6 +10,8 @@ import { COLORS, FONTS, icons, images, SIZES } from '../../../constants';
 import { logoutAction } from '../../../redux/slices/auth/authSlice';
 import { fontSize } from '../../../utils/fontSize';
 
+import { MEDIA_BASE_URL } from '../../../services/axios/api';
+
 const Profile = ({ navigation }) => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
@@ -24,6 +26,13 @@ const Profile = ({ navigation }) => {
     setModal(!modal);
   };
 
+  const profileUri =
+    user?.profileUrl && typeof user.profileUrl === 'string'
+      ? user.profileUrl.startsWith('http')
+        ? user.profileUrl
+        : `${MEDIA_BASE_URL}/${user.profileUrl}`
+      : null;
+
   return (
     <MainView transparent={false} bottomSafe={true}>
       <CustomHeader title="Profile" />
@@ -35,7 +44,10 @@ const Profile = ({ navigation }) => {
         >
           {/* Profile Section */}
           <View style={styles.profileSection}>
-            <Image style={styles.profile} source={{ uri: user?.profileUrl }} />
+            <Image
+              style={styles.profile}
+              source={profileUri ? { uri: profileUri } : images.userProfile}
+            />
 
             <View style={styles.nameSection}>
               <MainText style={styles.boldText}>{user?.name}</MainText>

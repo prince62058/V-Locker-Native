@@ -17,13 +17,15 @@ import SubmitButton from '../../../components/common/button/SubmitButton';
 import Input2 from '../../../components/common/input/Input2';
 import Seperator from '../../../components/common/seperator/Seperator';
 import CustomHeader from '../../../components/header/CustomHeader';
-import { COLORS, FONTS, SIZES } from '../../../constants';
+import { COLORS, FONTS, SIZES, icons } from '../../../constants';
 import { updateProfile } from '../../../redux/slices/auth/authSlice';
 import { pickImage } from '../../../services/picker/cropImagePicker';
 import { showToast } from '../../../utils/ToastAndroid';
 import { fontSize } from '../../../utils/fontSize';
 import { dateFormate } from '../../../utils/formating/date';
 import { updateCustomerThunk } from '../../../redux/slices/main/customerSlice';
+
+import { MEDIA_BASE_URL } from '../../../services/axios/api';
 
 const EditCustomer = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -74,6 +76,11 @@ const EditCustomer = ({ navigation }) => {
       }
     });
 
+    // WORKAROUND: Backend validation requires at least one text field.
+    if (updatedData.profileUrl && !updatedData.customerName) {
+      updatedData.customerName = form.customerName;
+    }
+
     if (Object.keys(updatedData).length === 0) {
       showToast('No changes to update');
       return;
@@ -87,6 +94,11 @@ const EditCustomer = ({ navigation }) => {
     if (updateCustomerThunk.fulfilled.match(response)) {
       showToast('Profile updated successfully');
       navigation.goBack();
+    } else {
+      const errorMsg =
+        response?.payload || response?.error?.message || 'Update failed';
+      console.log('Update customer profile failed:', errorMsg);
+      showToast(typeof errorMsg === 'string' ? errorMsg : 'Update failed');
     }
   };
 
@@ -109,6 +121,21 @@ const EditCustomer = ({ navigation }) => {
     };
   }, []);
 
+  const getProfileUri = () => {
+    if (!form.profileUrl) return null;
+    if (typeof form.profileUrl === 'object' && form.profileUrl.uri) {
+      return form.profileUrl.uri;
+    }
+    if (typeof form.profileUrl === 'string') {
+      if (form.profileUrl.startsWith('http')) return form.profileUrl;
+      const cleanPath = form.profileUrl.startsWith('/')
+        ? form.profileUrl.substring(1)
+        : form.profileUrl;
+      return `${MEDIA_BASE_URL}/${cleanPath}?t=${new Date().getTime()}`;
+    }
+    return null;
+  };
+
   return (
     <MainView transparent={false}>
       <CustomHeader title="Edit Profile" back />
@@ -125,14 +152,21 @@ const EditCustomer = ({ navigation }) => {
           }}
           showsVerticalScrollIndicator={false}
         >
-          <Pressable style={styles.profileImage} onPress={handleImageSelect}>
-            {form.profileUrl && (
-              <Image
-                source={{ uri: form.profileUrl?.uri || form?.profileUrl }}
-                style={{ width: '100%', height: '100%' }}
-              />
-            )}
-          </Pressable>
+          <View
+            style={{ alignSelf: 'center', marginBottom: SIZES.height * 0.02 }}
+          >
+            <Pressable style={styles.profileImage} onPress={handleImageSelect}>
+              {form.profileUrl && (
+                <Image
+                  source={{ uri: getProfileUri() }}
+                  style={{ width: '100%', height: '100%', borderRadius: 100 }}
+                />
+              )}
+            </Pressable>
+            <Pressable style={styles.editView} onPress={handleImageSelect}>
+              <Image source={icons.edit} style={styles.editIcon} />
+            </Pressable>
+          </View>
 
           <Seperator height={SIZES.height * 0.02} />
           <View style={styles.container}>
@@ -210,6 +244,24 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.borderLight,
     marginHorizontal: 'auto',
     borderRadius: 100,
-    overflow: 'hidden',
+    // overflow: 'hidden',
+  },
+  editView: {
+    position: 'absolute',
+    bottom: 0,
+    right: 5,
+    height: SIZES.width * 0.09,
+    width: SIZES.width * 0.09,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+  },
+  editIcon: {
+    height: SIZES.width * 0.05,
+    width: SIZES.width * 0.05,
+    resizeMode: 'contain',
+    tintColor: COLORS.white,
   },
 });
