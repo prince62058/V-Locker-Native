@@ -18,6 +18,7 @@ import DeviceInfo from 'react-native-device-info';
 import { getPublicMobileStatusThunk } from '../redux/slices/main/loanSlice';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import MaterialIcons from '@react-native-vector-icons/material-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { KioskModule } = NativeModules;
 
@@ -27,14 +28,24 @@ const DeviceLockScreen = () => {
   const [deviceImei, setDeviceImei] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Disable Back Button
+  // Disable Back Button & Enable Kiosk Mode
   useEffect(() => {
     const backAction = () => true;
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
       backAction,
     );
-    return () => backHandler.remove();
+
+    // Enable Kiosk Mode (Pin App)
+    if (KioskModule && KioskModule.enableKioskMode) {
+      KioskModule.enableKioskMode()
+        .then(() => console.log('Kiosk Mode Enabled via JS'))
+        .catch(err => console.error('Kiosk Mode Error:', err));
+    }
+
+    return () => {
+      backHandler.remove();
+    };
   }, []);
 
   // Fetch Device Status & Due Amount
@@ -58,24 +69,21 @@ const DeviceLockScreen = () => {
         // PRIORITY 2: Device Unique ID
         if (!id) {
           id = await DeviceInfo.getUniqueId();
-          const isEmulator = await DeviceInfo.isEmulator();
-
-          if (isEmulator || id === '8451923a78c5ab6a') {
-            // Using the actual loan IMEI from logs for testing in Emulator
-            id = '861993068365976';
-          }
         }
 
         setDeviceImei(id);
 
+        const storedPhone = await AsyncStorage.getItem('vlocker_user_phone');
         console.log(
           'DeviceLockScreen: Fetching for ID:',
           id,
+          'Phone Fallback:',
+          storedPhone,
           'isEmulator:',
           await DeviceInfo.isEmulator(),
         );
         const result = await dispatch(
-          getPublicMobileStatusThunk({ imei: id, phone: '6205872519' }),
+          getPublicMobileStatusThunk({ imei: id, phone: storedPhone || '' }),
         ).unwrap();
 
         if (result) {
@@ -131,6 +139,18 @@ const DeviceLockScreen = () => {
 
   const handleEmail = () => {
     Linking.openURL('mailto:princekumar5252@gmail.com');
+  };
+
+  const handleOpenWifi = () => {
+    if (KioskModule && KioskModule.openWifiSettings) {
+      KioskModule.openWifiSettings();
+    }
+  };
+
+  const handleOpenMobileData = () => {
+    if (KioskModule && KioskModule.openMobileDataSettings) {
+      KioskModule.openMobileDataSettings();
+    }
   };
 
   return (
@@ -207,6 +227,33 @@ const DeviceLockScreen = () => {
               <Text style={styles.contactValue}>princekumar5252@gmail.com</Text>
             </View>
           </TouchableOpacity>
+        </View>
+
+        {/* Network Access */}
+        <View style={styles.supportContainer}>
+          <Text style={styles.sectionTitle}>Internet & Network</Text>
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'space-between' }}
+          >
+            <TouchableOpacity
+              style={styles.networkButton}
+              onPress={handleOpenWifi}
+            >
+              <Ionicons name="wifi" size={24} color="#B00020" />
+              <Text style={styles.networkButtonText}>WiFi</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.networkButton}
+              onPress={handleOpenMobileData}
+            >
+              <Ionicons name="cellular" size={24} color="#B00020" />
+              <Text style={styles.networkButtonText}>Data</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.smallInfo}>
+            Use these buttons to connect to the internet to pay and unlock.
+          </Text>
         </View>
 
         {/* Footer Info */}
@@ -390,6 +437,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  networkButton: {
+    flex: 0.48,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#B00020',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  networkButtonText: {
+    color: '#B00020',
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+  smallInfo: {
+    fontSize: 11,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 10,
+    fontStyle: 'italic',
   },
 });
 

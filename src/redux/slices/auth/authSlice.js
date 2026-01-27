@@ -5,6 +5,7 @@ import {
   setSecureItem,
 } from '../../../services/storage/keychain';
 import { showToast } from '../../../utils/ToastAndroid';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const initialState = {
   token: null,
@@ -184,6 +185,7 @@ export const logoutThunk = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await deleteSecureItem('USER_TOKEN');
+      // Keep vlocker_loan_imei for persistent locking after logout
       return true;
     } catch (error) {
       return rejectWithValue(error);

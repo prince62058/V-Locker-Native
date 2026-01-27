@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -72,7 +72,11 @@ const Login = ({ navigation }) => {
     const response = await dispatch(sendOtp({ phone: number, type: 'login' }));
     setLocalLoading(false);
     if (sendOtp.fulfilled.match(response)) {
-      navigation.navigate('Otp', { phone: number, prefix });
+      navigation.navigate('Otp', {
+        phone: number,
+        prefix,
+        isCustomer: !isAdmin,
+      });
     } else {
       showToast(response?.payload?.message || 'Failed to send OTP');
     }

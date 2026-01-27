@@ -130,26 +130,44 @@ const Otp = ({ navigation, route }) => {
   };
 
   const handleOtpPress = async () => {
+    console.log('Verify Button Pressed');
     if (!validation()) {
+      console.log('Validation Failed');
       return;
     }
-    const response = await dispatch(
-      verifyOtp({
-        phone: paramsData?.phone,
-        otpCode: otp.join(''),
-        isCustomer: paramsData?.isCustomer,
-        imei: imei, // Send captured IMEI
-      }),
-    );
+    console.log('Validation Passed, Dispatching verifyOtp with:', {
+      phone: paramsData?.phone,
+      otpCode: otp.join(''),
+      isCustomer: paramsData?.isCustomer,
+      imei: imei,
+    });
 
-    if (verifyOtp.fulfilled.match(response)) {
-      if (paramsData?.isCustomer) {
-        // Customer logged in - navigation handled by Root.js
-      } else if (!response?.payload?.userData?.isProfileCompleted) {
-        navigation.navigate('CreateProfile');
+    try {
+      const response = await dispatch(
+        verifyOtp({
+          phone: paramsData?.phone,
+          otpCode: otp.join(''),
+          isCustomer: paramsData?.isCustomer,
+          imei: imei,
+        }),
+      );
+      console.log('VerifyOtp Response:', response);
+
+      if (verifyOtp.fulfilled.match(response)) {
+        console.log('VerifyOtp Fulfilled');
+        if (paramsData?.isCustomer) {
+          console.log('User is Customer, waiting for Root.js to switch');
+          // Customer logged in - navigation handled by Root.js
+        } else if (!response?.payload?.userData?.isProfileCompleted) {
+          console.log('Navigating to CreateProfile');
+          navigation.navigate('CreateProfile');
+        }
+      } else {
+        console.log('VerifyOtp Rejected:', response?.payload);
+        showToast(response?.payload?.message || 'Failed to verify OTP');
       }
-    } else {
-      // showToast(response?.payload?.message || 'Failed to send OTP')
+    } catch (e) {
+      console.error('VerifyOtp Dispatch Error:', e);
     }
   };
 

@@ -58,8 +58,8 @@ class LockService : Service() {
                     
                     // Enforce Data protection and App control protection
                     try {
-                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS)
-                        dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_WIFI)
+                        // dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS)
+                        // dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_CONFIG_WIFI)
                         dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_AIRPLANE_MODE)
                         dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_APPS_CONTROL)
                         dpm.addUserRestriction(adminComponent, UserManager.DISALLOW_UNINSTALL_APPS)
@@ -86,6 +86,10 @@ class LockService : Service() {
         if (!isRunning) {
             isRunning = true
             isForeground = true
+            
+            // Apply cached policy immediately for offline security
+            applyCachedPolicy()
+            
             startLockCheckLoop()
         }
         
@@ -109,10 +113,16 @@ class LockService : Service() {
             try {
                 // Get IMEI/Device ID
                 val deviceId = getDeviceIdentifier()
-                Log.d("LockService", "Checking lock status for device: $deviceId")
+                val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                val loanPhone = sharedPref.getString("loan_phone", "")
+                
+                Log.d("LockService", "Checking lock status for device: $deviceId, fallback phone: $loanPhone")
 
                 // Make API call
-                val apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
+                var apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
+                if (!loanPhone.isNullOrEmpty()) {
+                    apiUrl += "&phone=$loanPhone"
+                }
 
                 val url = URL(apiUrl)
                 val connection = url.openConnection() as HttpURLConnection
@@ -131,44 +141,104 @@ class LockService : Service() {
                         val status = jsonResponse.getString("status")
                         
                         // Handle lock/unlock
-                        when (status) {
-                            "LOCKED" -> {
-                                Log.d("LockService", "Device should be LOCKED")
-                                if (!isForeground) {
-                                    val notification = createNotification()
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-                                    } else {
-                                        startForeground(NOTIFICATION_ID, notification)
-                                    }
-                                    isForeground = true
-                                }
-                                enableKioskMode()
-                            }
-                            "UNLOCKED" -> {
-                                Log.d("LockService", "Device should be UNLOCKED")
-                                if (isForeground) {
-                                    stopForeground(true)
-                                    isForeground = false
-                                }
-                                disableKioskMode()
-                            }
+                        val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                        val lastStatus = sharedPref.getString("last_status", "UNLOCKED")
+                        
+                        // Save new status
+                        with(sharedPref.edit()) {
+                            putString("last_status", status)
+                            apply()
                         }
 
-                        // Handle policies if present
+                        if (status != lastStatus) {
+                             when (status) {
+                                "LOCKED" -> {
+                                    Log.d("LockService", "Status changed to LOCKED. Enforcing Lock.")
+                                    enforceLock()
+                                }
+                                "UNLOCKED" -> {
+                                    Log.d("LockService", "Status changed to UNLOCKED. Releasing Lock.")
+                                    releaseLock()
+                                }
+                            }
+                        } else {
+                            // Status is same, ensure lock is held if needed
+                             if (status == "LOCKED") {
+                                // Ensure app is in front, but don't re-enforce kiosk/policies
+                                // bringAppToFront() - REMOVED to prevent restart loop
+                             }
+                        }
+
+                        // Handle policies if changed
                         if (jsonResponse.has("policy")) {
                             val policy = jsonResponse.getJSONObject("policy")
-                            applyPolicies(policy)
+                            val policyStr = policy.toString()
+                            val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                            val lastPolicy = sharedPref.getString("last_policy", "")
+
+                            if (policyStr != lastPolicy) {
+                                Log.d("LockService", "Policy changed. Applying new policy.")
+                                with(sharedPref.edit()) {
+                                    putString("last_policy", policyStr)
+                                    apply()
+                                }
+                                applyPolicies(policy)
+                            }
                         }
                     }
                 } else {
                     Log.e("LockService", "API Error: Response code $responseCode")
+                    applyCachedPolicy()
                 }
                 connection.disconnect()
             } catch (e: Exception) {
                 Log.e("LockService", "Error checking lock status: ${e.message}")
+                applyCachedPolicy()
             }
         }.start()
+    }
+
+    private fun enforceLock() {
+        if (!isForeground) {
+            val notification = createNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            isForeground = true
+        }
+        enableKioskMode()
+    }
+
+    private fun releaseLock() {
+        if (isForeground) {
+            stopForeground(true)
+            isForeground = false
+        }
+        disableKioskMode()
+    }
+
+    private fun applyCachedPolicy() {
+        try {
+            val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val lastStatus = sharedPref.getString("last_status", "UNLOCKED")
+            val lastPolicy = sharedPref.getString("last_policy", null)
+
+            Log.d("LockService", "Applying cached policy. Status: $lastStatus")
+
+            if (lastStatus == "LOCKED") {
+                enforceLock()
+            } else {
+                releaseLock()
+            }
+
+            if (!lastPolicy.isNullOrEmpty()) {
+                applyPolicies(JSONObject(lastPolicy))
+            }
+        } catch (e: Exception) {
+            Log.e("LockService", "Error applying cached policy: ${e.message}")
+        }
     }
 
     private fun ensureNetworkHealth() {
@@ -195,7 +265,17 @@ class LockService : Service() {
     }
 
     private fun getDeviceIdentifier(): String {
-        return try {
+        try {
+            // 1. Try to get Loan IMEI from SharedPreferences first
+            val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val loanImei = sharedPref.getString("loan_imei", null)
+            
+            if (!loanImei.isNullOrEmpty()) {
+                Log.d("LockService", "Using Loan IMEI: $loanImei")
+                return loanImei
+            }
+
+            // 2. Fallback to Device IMEI/ID
             val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
             val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
@@ -212,9 +292,9 @@ class LockService : Service() {
                 }
             }
             
-            imei ?: Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            return imei ?: Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         } catch (e: Exception) {
-            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            return Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         }
     }
 
@@ -225,8 +305,8 @@ class LockService : Service() {
                 return
             }
 
-            // Set lock task packages
-            dpm.setLockTaskPackages(adminComponent, arrayOf(packageName))
+            // Set lock task packages (Allow Settings for internet recovery)
+            dpm.setLockTaskPackages(adminComponent, arrayOf(packageName, "com.android.settings"))
             
             // Disable status bar and keyguard
             dpm.setStatusBarDisabled(adminComponent, true)
@@ -237,12 +317,22 @@ class LockService : Service() {
             dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CREATE_WINDOWS)
             dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
             dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET)
-            dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
+            // dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
             dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
+            dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MODIFY_ACCOUNTS)
+            dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES)
+            
+            // Explicitly hide Play Store during hard lock (but allow Settings for WiFi access)
+            // setAppHidden("com.android.settings", true)
+            setAppHidden("com.android.vending", true)
 
             // Bring app to front and start lock task
             bringAppToFront()
             
+            // Save status for JS sync
+            val sharedPref = getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            sharedPref.edit().putString("last_status", "LOCKED").apply()
+
             Log.d("LockService", "Kiosk mode enabled")
         } catch (e: Exception) {
             Log.e("LockService", "Error enabling kiosk: ${e.message}")
@@ -260,6 +350,12 @@ class LockService : Service() {
             dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
             dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
             dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
+            dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MODIFY_ACCOUNTS)
+            dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES)
+            
+            // Re-enable Settings and Play Store
+            setAppHidden("com.android.settings", false)
+            setAppHidden("com.android.vending", false)
             
             // Re-enable status bar and keyguard
             dpm.setStatusBarDisabled(adminComponent, false)
@@ -268,6 +364,10 @@ class LockService : Service() {
             // Clear lock task packages
             dpm.setLockTaskPackages(adminComponent, arrayOf())
             
+            // Save status for JS sync
+            val sharedPref = getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            sharedPref.edit().putString("last_status", "UNLOCKED").apply()
+
             Log.d("LockService", "Kiosk mode disabled")
         } catch (e: Exception) {
             Log.e("LockService", "Error disabling kiosk: ${e.message}")
@@ -450,6 +550,21 @@ class LockService : Service() {
 
     private fun bringAppToFront() {
         try {
+            // Safety: If the user is in settings (to connect internet), don't force them out
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val tasks = am.getRunningTasks(1)
+            if (tasks.isNotEmpty()) {
+                val topActivity = tasks[0].topActivity?.packageName ?: ""
+                if (topActivity.contains("settings")) {
+                    Log.d("LockService", "Settings is in front, skipping bringAppToFront")
+                    return
+                }
+                if (topActivity == packageName) {
+                    Log.d("LockService", "App is already in front, skipping bringAppToFront")
+                    return
+                }
+            }
+
             val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

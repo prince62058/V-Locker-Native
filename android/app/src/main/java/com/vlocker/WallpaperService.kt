@@ -1,6 +1,7 @@
 package com.vlocker
 
 import android.app.*
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -129,37 +130,60 @@ class WallpaperService : Service() {
     private fun downloadAndSetWallpaper(urlString: String) {
         executor.execute {
             try {
-                Log.d("WallpaperService", "Downloading wallpaper from: $urlString")
+                Log.d("WallpaperService", "Starting download from: $urlString")
                 
-                // Fix for Android Emulator: localhost refers to device, need 10.0.2.2 to access host
                 var finalUrl = urlString
                 if (urlString.contains("localhost")) {
                     finalUrl = urlString.replace("localhost", "10.0.2.2")
-                    Log.d("WallpaperService", "Adjusted URL for Emulator: $finalUrl")
                 }
                 
                 val url = URL(finalUrl)
                 val connection = url.openConnection() as HttpURLConnection
-                connection.doInput = true
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.instanceFollowRedirects = true
                 connection.connect()
+
+                val responseCode = connection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    Log.e("WallpaperService", "HTTP Error: $responseCode for URL: $finalUrl")
+                    return@execute
+                }
+
+                val contentType = connection.contentType
+                Log.d("WallpaperService", "Content Type: $contentType, Length: ${connection.contentLength}")
+
                 val input = connection.inputStream
                 val bitmap = BitmapFactory.decodeStream(input)
+                input.close()
 
                 if (bitmap != null) {
+                    Log.d("WallpaperService", "Bitmap decoded: ${bitmap.width}x${bitmap.height}")
                     // Cache the bitmap
                     val cacheFile = File(filesDir, "admin_wallpaper.jpg")
-                    val out = FileOutputStream(cacheFile)
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                    out.flush()
-                    out.close()
+                    FileOutputStream(cacheFile).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                    }
+                    Log.d("WallpaperService", "Bitmap cached to: ${cacheFile.absolutePath}")
+
+                    // Safety: Clear restriction if it exists
+                    try {
+                        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                        val adminComponent = ComponentName(this, MyDeviceAdminReceiver::class.java)
+                        if (dpm.isDeviceOwnerApp(packageName)) {
+                            dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SET_WALLPAPER)
+                        }
+                    } catch (e: Exception) {
+                        Log.w("WallpaperService", "Could not clear restriction: ${e.message}")
+                    }
 
                     setDeviceWallpaper(bitmap)
-                    Log.d("WallpaperService", "Wallpaper set successfully")
                 } else {
-                    Log.e("WallpaperService", "Failed to decode bitmap")
+                    Log.e("WallpaperService", "Failed to decode bitmap from stream")
                 }
             } catch (e: Exception) {
-                Log.e("WallpaperService", "Error downloading wallpaper: ${e.message}")
+                Log.e("WallpaperService", "Exception in download: ${e.message}")
+                e.printStackTrace()
             }
         }
     }
@@ -167,15 +191,27 @@ class WallpaperService : Service() {
     private fun setDeviceWallpaper(bitmap: Bitmap) {
         try {
             val wallpaperManager = WallpaperManager.getInstance(applicationContext)
+            
+            // On some devices, we need to check if wallpaper setting is actually allowed
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-                Log.d("WallpaperService", "Wallpaper set successfully to Home and Lock screen")
+                if (wallpaperManager.isWallpaperSupported) {
+                    // Try setting both System and Lock
+                    try {
+                        wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+                        Log.d("WallpaperService", "Wallpaper set to System and Lock success")
+                    } catch (e: Exception) {
+                        Log.e("WallpaperService", "Failed to set combined: ${e.message}. Trying System only.")
+                        wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
+                    }
+                } else {
+                    Log.e("WallpaperService", "Wallpaper NOT supported on this device/user")
+                }
             } else {
                 wallpaperManager.setBitmap(bitmap)
-                Log.d("WallpaperService", "Wallpaper set successfully (legacy)")
+                Log.d("WallpaperService", "Legacy wallpaper set success")
             }
         } catch (e: Exception) {
-            Log.e("WallpaperService", "Error setting wallpaper: ${e.message}")
+            Log.e("WallpaperService", "Critical Error setting wallpaper: ${e.message}")
         }
     }
 

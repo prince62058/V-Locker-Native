@@ -30,7 +30,6 @@ import RequestKeys from '../../screens/main/keys/RequestKeys';
 import AddKeys from '../../screens/main/keys/AddKeys';
 import KeysHistory from '../../screens/main/keys/KeysHistory';
 import LockScreen from '../../screens/auth/LockScreen';
-
 const Stack = createNativeStackNavigator();
 
 const Main = ({ initialRouteName = 'Tab' }) => {

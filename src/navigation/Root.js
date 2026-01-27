@@ -56,6 +56,18 @@ const Root = () => {
         console.log('Root: FCM Token synced successfully.');
         await setItem(ASYNC_DATA.FCM_TOKEN, fcmToken);
       }
+
+      // Store user phone for DeviceLockService fallback
+      if (user?.phone) {
+        await setItem('vlocker_user_phone', user.phone);
+        console.log('Root: Stored User Phone for Lock fallback:', user.phone);
+        try {
+          await KioskModule.setLoanPhone(user.phone);
+          console.log('Root: Native KioskModule Loan Phone set successfully');
+        } catch (phoneErr) {
+          console.log('Root: Failed to set Native Loan Phone:', phoneErr);
+        }
+      }
     } catch (error) {
       console.log('Root: FCM Token sync failed', error);
     }
@@ -64,32 +76,81 @@ const Root = () => {
   useEffect(() => {
     if (token) {
       handleFcmTokenSync();
+
+      // Fetch and Store Real IMEI for this user/loan
+      const fetchAndStoreLoanImei = async () => {
+        try {
+          console.log('Root: Fetching Loan IMEI for accurate locking...');
+          const res = await getApi('/customerLoan/mobile/status');
+          // console.log('Loan Status Response:', res);
+
+          if (
+            res?.success &&
+            (res?.data?.imeiNumber1 || res?.data?.imeiNumber2)
+          ) {
+            const loanImei = res.data.imeiNumber1 || res.data.imeiNumber2;
+            await setItem('vlocker_loan_imei', loanImei);
+            console.log('Root: Stored Loan IMEI successfully:', loanImei);
+
+            // Bridge to Native for LockService
+            try {
+              await KioskModule.setLoanImei(loanImei);
+              console.log(
+                'Root: Native KioskModule Loan IMEI set successfully',
+              );
+            } catch (kioskErr) {
+              console.log('Root: Failed to set Native Loan IMEI:', kioskErr);
+            }
+          } else {
+            // If no loan found, we can't do much, relying on fallback
+            console.log('Root: No active loan or IMEI found for this user.');
+          }
+        } catch (error) {
+          console.log('Root: Error fetching Loan IMEI:', error);
+        }
+      };
+
+      fetchAndStoreLoanImei();
     }
   }, [token]);
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Tab');
   const [isLocked, setIsLocked] = useState(false);
 
-  // Initialize Lock State from Storage immediately
+  // Initialize Lock State from Storage immediately (Source of truth: Native)
   useEffect(() => {
     const initLockState = async () => {
-      const storedStatus = await AsyncStorage.getItem('vlocker_lock_status');
-      if (storedStatus === 'LOCKED') {
-        setIsLocked(true);
+      try {
+        const nativeStatus = await KioskModule.getLockStatus();
+        console.log('Root: Initial Native Lock Status sync:', nativeStatus);
+
+        if (nativeStatus === 'LOCKED') {
+          setIsLocked(true);
+        } else {
+          // Fallback check to AsyncStorage for redundant safety
+          const storedStatus = await AsyncStorage.getItem(
+            'vlocker_lock_status',
+          );
+          if (storedStatus === 'LOCKED') {
+            setIsLocked(true);
+          }
+        }
+      } catch (e) {
+        console.warn('Root: Failed to init lock state from native:', e);
       }
     };
     initLockState();
   }, []);
 
-  // Polling for Remote Lock
+  // Polling for Remote Lock & Service Management
   useEffect(() => {
     // Start the robust Lock Service
+    // Pass user role: 'admin' will STOP service, others will START it.
     DeviceLockService.startLockService(user?.role);
 
-    return () => {
-      DeviceLockService.stopLockService();
-    };
-  }, [user?.role]); // Run on mount and when role changes
+    // We do NOT stop the service on unmount generally, relying on the service's internal logic
+    // to keep running unless explicitly stopped by admin login.
+  }, [user?.role]);
 
   useEffect(() => {
     const checkPin = async () => {
@@ -115,18 +176,14 @@ const Root = () => {
       try {
         const pin = await AsyncStorage.getItem('APP_LOCK_PIN');
         if (!pin && initialRoute === 'LockScreen') {
-          // PIN was removed, update route
           setInitialRoute('Tab');
         } else if (pin && initialRoute === 'Tab') {
-          // PIN was added, update route
           setInitialRoute('LockScreen');
         }
       } catch (e) {
         console.error(e);
       }
     };
-
-    // Check periodically or on navigation events
     const interval = setInterval(checkPinOnFocus, 1000);
     return () => clearInterval(interval);
   }, [initialRoute]);
@@ -136,11 +193,13 @@ const Root = () => {
     const subscription = DeviceEventEmitter.addListener(
       'LOCK_STATUS_CHANGED',
       async event => {
-        console.log('Event Emitter: Received LOCK_STATUS_CHANGED', event);
+        console.log('ROOT_JS: Received LOCK_STATUS_CHANGED event:', event);
         if (event.status === 'LOCKED') {
+          console.log('ROOT_JS: Setting isLocked = TRUE');
           setIsLocked(true);
           await AsyncStorage.setItem('vlocker_lock_status', 'LOCKED');
         } else if (event.status === 'UNLOCKED') {
+          console.log('ROOT_JS: Setting isLocked = FALSE');
           setIsLocked(false);
           await AsyncStorage.setItem('vlocker_lock_status', 'UNLOCKED');
         }
@@ -150,12 +209,9 @@ const Root = () => {
     const screenOffSubscription = DeviceEventEmitter.addListener(
       'SCREEN_OFF',
       async () => {
-        console.log('Event Emitter: Received SCREEN_OFF');
         // Check if App Lock is enabled
         const pin = await AsyncStorage.getItem('APP_LOCK_PIN');
         const lockStatus = await AsyncStorage.getItem('vlocker_lock_status');
-
-        // Only navigate to Lock Screen if Device is NOT already remotely locked
         if (pin && lockStatus !== 'LOCKED') {
           if (navigationRef.isReady()) {
             navigationRef.navigate('LockScreen');
@@ -167,16 +223,18 @@ const Root = () => {
     const screenOnSubscription = DeviceEventEmitter.addListener(
       'SCREEN_ON',
       async () => {
-        console.log('Event Emitter: Received SCREEN_ON');
-        const lockStatus = await AsyncStorage.getItem('vlocker_lock_status');
-        if (lockStatus === 'LOCKED') {
-          console.log('Screen ON & Locked -> Bringing to Front');
-          setIsLocked(true); // Ensure state updates
+        const nativeStatus = await KioskModule.getLockStatus();
+        console.log('Root: SCREEN_ON sync. Native Status:', nativeStatus);
+
+        if (nativeStatus === 'LOCKED') {
+          setIsLocked(true);
+          await AsyncStorage.setItem('vlocker_lock_status', 'LOCKED');
           try {
             await KioskModule.bringAppToFront();
-          } catch (e) {
-            console.log('Error bringAppToFront:', e);
-          }
+          } catch (e) {}
+        } else {
+          setIsLocked(false);
+          await AsyncStorage.setItem('vlocker_lock_status', 'UNLOCKED');
         }
       },
     );
@@ -203,7 +261,7 @@ const Root = () => {
     );
   }
 
-  // FORCE RENDER LOCK SCREEN
+  // FORCE RENDER LOCK SCREEN if locked
   if (isLocked) {
     return <DeviceLockScreen />;
   }
@@ -214,11 +272,7 @@ const Root = () => {
         <GestureHandlerRootView style={styles.container}>
           <BottomSheetModalProvider>
             <NavigationContainer ref={navigationRef}>
-              {token && user?.isProfileCompleted ? (
-                <Main initialRouteName={initialRoute} />
-              ) : (
-                <Auth />
-              )}
+              {token ? <Main initialRouteName={initialRoute} /> : <Auth />}
             </NavigationContainer>
           </BottomSheetModalProvider>
         </GestureHandlerRootView>

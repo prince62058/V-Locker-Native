@@ -22,7 +22,7 @@ import { getLoanDetailsThunk } from '../../../redux/slices/main/loanSlice';
 import { fontSize } from '../../../utils/fontSize';
 
 const LoanInfo = ({ navigation, route }) => {
-  const { loanId } = route.params || {};
+  const { loanId, initialTab } = route.params || {};
 
   const dispatch = useDispatch();
   const {
@@ -33,10 +33,27 @@ const LoanInfo = ({ navigation, route }) => {
     searchData,
     searchPagination,
   } = useSelector(state => state.loan);
+  const { user } = useSelector(state => state.auth);
   console.log('Loan details ---> ', loanDetails);
   console.log('Loan Info Screen Rendered with long prop');
 
-  const [activeToggle, setActiveToggle] = useState('details');
+  /* 
+     If user is NOT admin, force 'Installments' view and hide toggle.
+     If user IS admin, show toggle and respect initialTab or default to 'details'.
+  */
+  const isCustomer = user?.role !== 'admin';
+
+  // Set initial state based on role
+  const [activeToggle, setActiveToggle] = useState(
+    isCustomer ? 'Installments' : initialTab || 'details',
+  );
+
+  // Effect to enforce Installments for customers if somehow changed
+  useEffect(() => {
+    if (isCustomer && activeToggle !== 'Installments') {
+      setActiveToggle('Installments');
+    }
+  }, [isCustomer, activeToggle]);
 
   const fetchData = useCallback(
     ({ isRefresh = false }) => {
@@ -116,32 +133,34 @@ const LoanInfo = ({ navigation, route }) => {
       <CustomHeader title="Loan Info" back />
 
       <View style={styles.mainStyle}>
-        <View style={styles.toggleButton}>
-          <Pressable
-            style={[
-              styles.textView,
-              {
-                backgroundColor:
-                  activeToggle == 'details' ? COLORS.primary : null,
-              },
-            ]}
-            onPress={() => setActiveToggle('details')}
-          >
-            <MainText style={styles.toggleText}>Details</MainText>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.textView,
-              {
-                backgroundColor:
-                  activeToggle == 'Installments' ? COLORS.primary : null,
-              },
-            ]}
-            onPress={() => setActiveToggle('Installments')}
-          >
-            <MainText style={styles.toggleText}>Installments</MainText>
-          </Pressable>
-        </View>
+        {!isCustomer && (
+          <View style={styles.toggleButton}>
+            <Pressable
+              style={[
+                styles.textView,
+                {
+                  backgroundColor:
+                    activeToggle == 'details' ? COLORS.primary : null,
+                },
+              ]}
+              onPress={() => setActiveToggle('details')}
+            >
+              <MainText style={styles.toggleText}>Details</MainText>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.textView,
+                {
+                  backgroundColor:
+                    activeToggle == 'Installments' ? COLORS.primary : null,
+                },
+              ]}
+              onPress={() => setActiveToggle('Installments')}
+            >
+              <MainText style={styles.toggleText}>Installments</MainText>
+            </Pressable>
+          </View>
+        )}
 
         {activeToggle == 'details' ? (
           <View style={{ flex: 1 }}>
@@ -196,42 +215,44 @@ const LoanInfo = ({ navigation, route }) => {
                   }}
                 />
 
-                <SubmitButton
-                  title="Delete Loan"
-                  onPress={() => {
-                    const { Alert } = require('react-native');
-                    Alert.alert(
-                      'Delete Loan',
-                      'Are you sure you want to delete this loan?',
-                      [
-                        {
-                          text: 'Cancel',
-                          style: 'cancel',
-                        },
-                        {
-                          text: 'Delete',
-                          onPress: async () => {
-                            const {
-                              deleteLoanThunk,
-                            } = require('../../../redux/slices/main/loanSlice');
-                            await dispatch(
-                              deleteLoanThunk({ id: loanDetails?._id }),
-                            );
-                            navigation.goBack();
+                {user?.role === 'admin' && (
+                  <SubmitButton
+                    title="Delete Loan"
+                    onPress={() => {
+                      const { Alert } = require('react-native');
+                      Alert.alert(
+                        'Delete Loan',
+                        'Are you sure you want to delete this loan?',
+                        [
+                          {
+                            text: 'Cancel',
+                            style: 'cancel',
                           },
-                          style: 'destructive',
-                        },
-                      ],
-                    );
-                  }}
-                  mainStyle={{
-                    marginHorizontal: 0,
-                    width: '100%',
-                    marginTop: 10,
-                    height: fontSize(50),
-                    backgroundColor: COLORS.red,
-                  }}
-                />
+                          {
+                            text: 'Delete',
+                            onPress: async () => {
+                              const {
+                                deleteLoanThunk,
+                              } = require('../../../redux/slices/main/loanSlice');
+                              await dispatch(
+                                deleteLoanThunk({ id: loanDetails?._id }),
+                              );
+                              navigation.goBack();
+                            },
+                            style: 'destructive',
+                          },
+                        ],
+                      );
+                    }}
+                    mainStyle={{
+                      marginHorizontal: 0,
+                      width: '100%',
+                      marginTop: 10,
+                      height: fontSize(50),
+                      backgroundColor: COLORS.red,
+                    }}
+                  />
+                )}
               </View>
             </ScrollView>
 
@@ -243,38 +264,39 @@ const LoanInfo = ({ navigation, route }) => {
             ></View>
 
             {/* APPROVE / REJECT BUTTONS */}
-            {loanDetails?.loanStatus === 'PENDING' && (
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  paddingHorizontal: 10,
-                }}
-              >
-                <SubmitButton
-                  title="Reject"
-                  onPress={handleReject}
-                  mainStyle={{
-                    width: '45%',
-                    backgroundColor: COLORS.lightBlack, // or 'transparent' with border if needed
-                    marginHorizontal: 0,
+            {loanDetails?.loanStatus === 'PENDING' &&
+              user?.role === 'admin' && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    paddingHorizontal: 10,
                   }}
-                  textStyle={{ color: COLORS.white }}
-                />
-                <SubmitButton
-                  title="Approve"
-                  onPress={handleApprove}
-                  mainStyle={{
-                    width: '45%',
-                    backgroundColor: '#799F05', // Match the green color from screenshot
-                    marginHorizontal: 0,
-                  }}
-                />
-              </View>
-            )}
+                >
+                  <SubmitButton
+                    title="Reject"
+                    onPress={handleReject}
+                    mainStyle={{
+                      width: '45%',
+                      backgroundColor: COLORS.lightBlack, // or 'transparent' with border if needed
+                      marginHorizontal: 0,
+                    }}
+                    textStyle={{ color: COLORS.white }}
+                  />
+                  <SubmitButton
+                    title="Approve"
+                    onPress={handleApprove}
+                    mainStyle={{
+                      width: '45%',
+                      backgroundColor: '#799F05', // Match the green color from screenshot
+                      marginHorizontal: 0,
+                    }}
+                  />
+                </View>
+              )}
           </View>
         ) : (
           <FlatList

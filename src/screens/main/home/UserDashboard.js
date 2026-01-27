@@ -23,7 +23,7 @@ import {
 } from '../../../utils/responsive';
 import { COLORS, FONTS, SIZES } from '../../../constants';
 
-const UserDashboard = () => {
+const UserDashboard = ({ navigation }) => {
   const { user } = useSelector(state => state.auth);
   const { homeData } = useSelector(state => state.home);
 
@@ -145,7 +145,7 @@ const UserDashboard = () => {
               <View style={styles.row}>
                 <MainText style={styles.label}>Amount:</MainText>
                 <MainText style={styles.value}>
-                  ₹ {homeData?.amount ? String(homeData.amount) : '0'}
+                  {`₹ ${homeData?.amount ? homeData.amount : '0'}`}
                 </MainText>
               </View>
               <View style={[styles.row, { marginTop: verticalScale(10) }]}>
@@ -165,6 +165,42 @@ const UserDashboard = () => {
                   {homeData?.status}
                 </MainText>
               </View>
+
+              {/* View Full Details Button */}
+              <TouchableOpacity
+                style={{
+                  marginTop: verticalScale(15),
+                  backgroundColor: COLORS.primary,
+                  padding: moderateScale(10),
+                  borderRadius: moderateScale(8),
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  console.log('HomeData on Button Press:', homeData);
+                  if (homeData?.loanId) {
+                    navigation.navigate('LoanInfo', {
+                      loanId: homeData.loanId,
+                      initialTab: 'Installments',
+                    });
+                  } else {
+                    console.warn('Loan ID missing in homeData');
+                    Alert.alert(
+                      'Error',
+                      'Loan Details not found. Please pull to refresh.',
+                    );
+                  }
+                }}
+              >
+                <MainText
+                  style={{
+                    color: COLORS.white,
+                    fontFamily: FONTS.bold,
+                    fontSize: fontSize(14),
+                  }}
+                >
+                  View Installments Only
+                </MainText>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (

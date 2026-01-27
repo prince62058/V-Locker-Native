@@ -11,74 +11,106 @@ const checkLockStatus = async () => {
   try {
     // 1. Get Device ID
     // 1. Get Device ID
-    let imei = '';
-    try {
-      imei = await KioskModule.getDeviceImei();
-    } catch (e) {
-      console.warn('Failed to fetch real IMEI, falling back to Android ID:', e);
-      imei = await DeviceInfo.getUniqueId();
-    }
-    console.log('Checking Lock Status for ID (Public):', imei);
+    let imei = await AsyncStorage.getItem('vlocker_loan_imei');
 
-    // FOR DEBUGGING ONLY: Remove hardcoded IMEI
-    // imei = '867400022047199';
-    // console.log(`[DEBUG] FORCED Emulator IMEI to: ${imei}`);
+    if (!imei) {
+      console.log('No stored Loan IMEI found. Falling back to native check.');
+      try {
+        imei = await KioskModule.getDeviceImei();
+      } catch (e) {
+        console.warn(
+          'Failed to fetch real IMEI, falling back to Android ID:',
+          e,
+        );
+        imei = await DeviceInfo.getUniqueId();
+      }
+    }
+
+    console.log('Checking Lock Status for ID:', imei);
 
     // 2. Initial Offline Check (Fast Lock)
-    // If we haven't checked yet (e.g. app just started), verify local storage first
-    // This protects against "Restart -> No Internet" evasion
+    // Always use Native status as the absolute source of truth
+    const nativeStatus = await KioskModule.getLockStatus();
     const localStatus = await AsyncStorage.getItem(LOCK_STATUS_KEY);
-    console.log('Local stored lock status:', localStatus);
+    console.log(
+      'Native stored lock status:',
+      nativeStatus,
+      'Local:',
+      localStatus,
+    );
 
-    if (localStatus === 'LOCKED') {
+    if (nativeStatus === 'LOCKED') {
+      // Sync AsyncStorage just in case
+      await AsyncStorage.setItem(LOCK_STATUS_KEY, 'LOCKED');
       // Enforce lock immediately before network call
       await KioskModule.enableKioskMode();
       try {
         await KioskModule.bringAppToFront();
       } catch (e) {}
       DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' }); // Emit event
+    } else {
+      // If native says UNLOCKED but JS thought LOCKED, sync it
+      if (localStatus === 'LOCKED' && nativeStatus === 'UNLOCKED') {
+        await AsyncStorage.setItem(LOCK_STATUS_KEY, 'UNLOCKED');
+        DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' });
+      }
     }
 
     // 3. Network Check
     // Using a direct fetch for maximum robustness independent of app state
     const API_URL = 'https://vlockerbackend.onrender.com/api';
+    const userPhone = await AsyncStorage.getItem('vlocker_user_phone');
 
     // We add a timestamp to avoid caching issues if any
-    const response = await fetch(
-      `${API_URL}/customerLoan/status/public?imei=${imei}&t=${Date.now()}`,
-    );
+    let url = `${API_URL}/customerLoan/status/public?imei=${imei}&t=${Date.now()}`;
+    if (userPhone) {
+      url += `&phone=${userPhone}`;
+    }
+
+    const response = await fetch(url);
     const data = await response.json();
 
     console.log('Lock Status Response:', data);
 
     if (data?.success) {
+      console.log('DEVICE_LOCK_SERVICE: API Success. Status:', data.status);
       // 1. Handle Encryption/Lock Status
       if (data.status === 'LOCKED') {
         // Update Local State
-        // Update Local State
-        if (localStatus !== 'LOCKED') {
-          await AsyncStorage.setItem(LOCK_STATUS_KEY, 'LOCKED');
-        }
-        console.log('Device should be LOCKED. Enabling Kiosk Mode...');
-        await KioskModule.enableKioskMode();
+        console.log('DEVICE_LOCK_SERVICE: Status is LOCKED.');
 
-        // Ensure app is visible - Always call this to prevent user from escaping
-        try {
-          await KioskModule.bringAppToFront();
-        } catch (e) {
-          console.log('Error bringing app to front:', e);
+        // Only call enableKioskMode if we weren't already locked
+        const currentNative = await KioskModule.getLockStatus();
+        if (currentNative !== 'LOCKED') {
+          await AsyncStorage.setItem(LOCK_STATUS_KEY, 'LOCKED');
+          console.log('DEVICE_LOCK_SERVICE: Enabling Kiosk Mode...');
+          await KioskModule.enableKioskMode();
+        } else {
+          // Already locked, do nothing to prevent loop
+          // await KioskModule.bringAppToFront();
         }
+
+        // try {
+        //   await KioskModule.bringAppToFront();
+        // } catch (e) {
+        //   console.log('Error bringing app to front:', e);
+        // }
 
         DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' }); // Emit event
-      } else {
-        // Explicitly UNLOCKED or fallback for no active loan/loan not approved
+      } else if (data.status === 'UNLOCKED') {
+        // Explicitly UNLOCKED
         // Update Local State
+        console.log('DEVICE_LOCK_SERVICE: Status is UNLOCKED.');
         if (localStatus !== 'UNLOCKED') {
           await AsyncStorage.setItem(LOCK_STATUS_KEY, 'UNLOCKED');
         }
-        console.log('Device should be UNLOCKED. Disabling Kiosk Mode...');
         await KioskModule.disableKioskMode();
         DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'UNLOCKED' }); // Emit event
+      } else {
+        console.log(
+          'DEVICE_LOCK_SERVICE: Status is unknown/inactive:',
+          data.status,
+        );
       }
 
       // 2. Handle Policies (Reset & Uninstall)
@@ -105,15 +137,11 @@ const checkLockStatus = async () => {
             );
           }
 
-          // Developer Options - DISABLED ENFORCEMENT as requested
-          // We want Developer Options to REMAIN ENABLED for now.
-          // if (data.policy.hasOwnProperty('isDeveloperOptionsBlocked')) {
-          //   const shouldBlock = data.policy.isDeveloperOptionsBlocked;
-          //   await KioskModule.setDeveloperOptionsAllowed(!shouldBlock);
-          // }
-
-          // Force Enable Developer Options (Optional, but safe redundant check)
-          await KioskModule.setDeveloperOptionsAllowed(true);
+          // Developer Options - Policy Driven Control
+          if (data.policy.hasOwnProperty('isDeveloperOptionsBlocked')) {
+            const shouldBlock = data.policy.isDeveloperOptionsBlocked;
+            await KioskModule.setDeveloperOptionsAllowed(!shouldBlock);
+          }
 
           // Handle App Blocks (WhatsApp, YouTube, etc.)
           const appBlocks = [
@@ -141,7 +169,13 @@ const checkLockStatus = async () => {
       }
     }
   } catch (error) {
-    console.error('Error checking lock status:', error);
+    if (error?.message?.includes('Current activity is null')) {
+      console.log(
+        'Background lock check: Activity not yet available (App in bg)',
+      );
+    } else {
+      console.warn('Background lock check status:', error?.message || error);
+    }
     // If Network Error occurs, we rely on the Local Status check we did at the start of the function.
     // If local was LOCKED, we already called enableKioskMode().
     // So we are safe.

@@ -31,8 +31,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
                 android.util.Log.d("KioskModule", "App is Device Owner. Setting restrictions...")
                 
-                // 1. Set Lock Task Packages (Allow only this app)
-                dpm.setLockTaskPackages(adminComponent, arrayOf(reactApplicationContext.packageName))
+                // 1. Set Lock Task Packages (Allow this app and Settings for internet recovery)
+                dpm.setLockTaskPackages(adminComponent, arrayOf(reactApplicationContext.packageName, "com.android.settings"))
                 
                 // 2. Clear any existing PIN/Password
                 try {
@@ -81,8 +81,20 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         )
                         // Start Lock Task
                         try {
-                            activity.startLockTask()
-                            android.util.Log.d("KioskModule", "startLockTask executed")
+                            val am = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                if (am.lockTaskModeState == android.app.ActivityManager.LOCK_TASK_MODE_NONE) {
+                                     activity.startLockTask()
+                                     android.util.Log.d("KioskModule", "startLockTask executed")
+                                } else {
+                                     android.util.Log.d("KioskModule", "Already in LockTask mode, skipping startLockTask")
+                                }
+                            } else {
+                                // For older versions, just try it (or skip if risky, but usually safe to call)
+                                if (!am.isInLockTaskMode) {
+                                    activity.startLockTask()
+                                }
+                            }
                         } catch (e: Exception) {
                             android.util.Log.e("KioskModule", "startLockTask FAILED: " + e.message)
                         }
@@ -91,6 +103,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                      android.util.Log.w("KioskModule", "Activity is null, skipping UI-immersive/lockTask steps")
                 }
                 
+                // Save status for JS sync
+                val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                sharedPref.edit().putString("last_status", "LOCKED").apply()
+
                 // Always resolve if we are Device Owner, even if UI part skipped (Service will handle lock loop)
                 promise.resolve(true)
             } else {
@@ -105,60 +121,54 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     @ReactMethod
     fun disableKioskMode(promise: Promise) {
-        val activity = getCurrentActivity()
-        if (activity == null) {
-                promise.reject("NO_ACTIVITY", "Current activity is null")
-                return
-        }
+        try {
+            if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                // 1. Clear Global Restrictions (Can be done without Activity)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CREATE_WINDOWS)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADJUST_VOLUME)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADD_USER)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_USB_FILE_TRANSFER)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
+                
+                // 2. Default Features
+                dpm.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
+                dpm.setStatusBarDisabled(adminComponent, false)
+                dpm.setKeyguardDisabledFeatures(adminComponent, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE)
 
-        activity.runOnUiThread {
-            try {
-                if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
-                    // 1. Clear Global Restrictions that might affect UI
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CREATE_WINDOWS)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SAFE_BOOT)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADJUST_VOLUME)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
-                    // dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET) // Keep this restricted!
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_ADD_USER)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_USB_FILE_TRANSFER)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
-                    dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
-                    
-                    // 2. Set Lock Task Features to defaults
-                    dpm.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
-
-                    // 3. Explicitly Re-enable Status Bar & Keyguard
-                    dpm.setStatusBarDisabled(adminComponent, false)
-                    dpm.setKeyguardDisabledFeatures(adminComponent, DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE)
-
-                    // 4. Stop Lock Task
-                    activity.stopLockTask()
-                    
-                    // 5. Clear Lock Task Packages
-                    dpm.setLockTaskPackages(adminComponent, arrayOf())
-
-                    // 6. Force UI Visibility
-                    // Reset to stable layout then visible
-                    activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-                    
-                    // Clear all potentially hiding flags
-                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
-                    
-                    // Force redraw
-                    activity.window.decorView.requestLayout()
-
-                    promise.resolve(true)
+                // 3. Activity-dependent operations (stopLockTask)
+                val activity = getCurrentActivity()
+                if (activity != null) {
+                    activity.runOnUiThread {
+                        try {
+                            activity.stopLockTask()
+                            activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                            activity.window.decorView.requestLayout()
+                        } catch (e: Exception) {
+                            android.util.Log.e("KioskModule", "Error in activity-based unpin: " + e.message)
+                        }
+                    }
                 } else {
-                    promise.reject("NOT_OWNER", "App is not Device Owner")
+                    android.util.Log.w("KioskModule", "disableKioskMode: Activity is null, restrictions cleared but stopLockTask skipped.")
                 }
-            } catch (e: Exception) {
-                promise.reject("ERROR", e.message)
+                
+                // 4. Clear Lock Task Packages (DO only)
+                dpm.setLockTaskPackages(adminComponent, arrayOf())
+                
+                // Save status for JS sync
+                val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                sharedPref.edit().putString("last_status", "UNLOCKED").apply()
+
+                promise.resolve(true)
+            } else {
+                promise.reject("NOT_OWNER", "App is not Device Owner")
             }
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
         }
     }
 
@@ -217,14 +227,57 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
+    fun openWifiSettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun openMobileDataSettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun bringAppToFront(promise: Promise) {
         try {
             android.util.Log.d("KioskModule", "Bringing App to Front...")
+
+            val am = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val tasks = am.getRunningTasks(1)
+            if (tasks.isNotEmpty()) {
+                val topActivity = tasks[0].topActivity?.packageName ?: ""
+                // If user is in settings (internet recovery), don't kick them out
+                if (topActivity.contains("settings")) {
+                    android.util.Log.d("KioskModule", "Settings is in front, skipping bringAppToFront")
+                    promise.resolve(true)
+                    return
+                }
+                // If app is already in front, don't restart it (prevent jitter)
+                if (topActivity == reactApplicationContext.packageName) {
+                    android.util.Log.d("KioskModule", "App is already in front, skipping bringAppToFront")
+                    promise.resolve(true)
+                    return
+                }
+            }
+
             wakeUpDevice() // WAKE UP THE DEVICE FIRST
 
             val packageName = reactApplicationContext.packageName
             val launchIntent = reactApplicationContext.packageManager.getLaunchIntentForPackage(packageName)
-            
+
             if (launchIntent != null) {
                 launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
@@ -380,6 +433,32 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
+    fun updateWallpaper(enabled: Boolean, wallpaperUrl: String, promise: Promise) {
+        try {
+            val intent = Intent(reactApplicationContext, WallpaperService::class.java)
+            if (enabled && !wallpaperUrl.isNullOrEmpty()) {
+                intent.putExtra("wallpaperUrl", wallpaperUrl)
+                intent.putExtra("isEnabled", true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    reactApplicationContext.startForegroundService(intent)
+                } else {
+                    reactApplicationContext.startService(intent)
+                }
+            } else {
+                intent.action = "STOP_SERVICE"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    reactApplicationContext.startForegroundService(intent)
+                } else {
+                    reactApplicationContext.startService(intent)
+                }
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun getDeviceImei(promise: Promise) {
         try {
              if (androidx.core.content.ContextCompat.checkSelfPermission(reactApplicationContext, android.Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -405,6 +484,58 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             } else {
                 promise.reject("ERROR", "IMEI is null")
             }
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setLoanPhone(phone: String, promise: Promise) {
+        try {
+            val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            with (sharedPref.edit()) {
+                putString("loan_phone", phone)
+                commit()
+            }
+            android.util.Log.d("KioskModule", "Loan Phone saved: $phone")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setLoanImei(imei: String, promise: Promise) {
+        try {
+            val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            with (sharedPref.edit()) {
+                putString("loan_imei", imei)
+                commit()
+            }
+            android.util.Log.d("KioskModule", "Loan IMEI saved: $imei")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getProvisionedImei(promise: Promise) {
+        try {
+            val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val loanImei = sharedPref.getString("loan_imei", null)
+            promise.resolve(loanImei)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getLockStatus(promise: Promise) {
+        try {
+            val sharedPref = reactApplicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val status = sharedPref.getString("last_status", "UNLOCKED")
+            promise.resolve(status)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
         }
