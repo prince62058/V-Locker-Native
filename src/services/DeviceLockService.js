@@ -150,6 +150,13 @@ const checkLockStatus = async () => {
             { key: 'isSnapchatBlocked', package: 'com.snapchat.android' },
             { key: 'isYouTubeBlocked', package: 'com.google.android.youtube' },
             { key: 'isFacebookBlocked', package: 'com.facebook.katana' },
+            { key: 'isDialerBlocked', package: 'com.google.android.dialer' }, // Standard Google Dialer
+            {
+              key: 'isMessagesBlocked',
+              package: 'com.google.android.apps.messaging',
+            }, // Google Messages
+            { key: 'isPlayStoreBlocked', package: 'com.android.vending' },
+            { key: 'isChromeBlocked', package: 'com.android.chrome' },
           ];
 
           for (const app of appBlocks) {
