@@ -34,6 +34,7 @@ const DeviceLockScreen = () => {
   const [deviceImei, setDeviceImei] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [shopName, setShopName] = useState('Satya Kabir E-solutions Pvt. Ltd.');
 
   // Disable Back Button & Enable Kiosk Mode
   useEffect(() => {
@@ -115,6 +116,7 @@ const DeviceLockScreen = () => {
               name: loan.customerId?.customerName || 'Customer',
               email: loan.customerId?.customerEmail || 'customer@vlocker.com',
             });
+            setShopName(loan.shopName || 'Satya Kabir E-solutions Pvt. Ltd.');
           } else {
             console.log('DeviceLockScreen: No loan data found in result');
           }
@@ -324,9 +326,7 @@ const DeviceLockScreen = () => {
 
         {/* Company Branding */}
         <View style={styles.brandingContainer}>
-          <Text style={styles.companyName}>
-            Satya Kabir E-solutions Pvt. Ltd.
-          </Text>
+          <Text style={styles.companyName}>{shopName}</Text>
           <Text style={styles.companyTagline}>
             IT Software & Digital Marketing Agency
           </Text>

@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   Alert,
   NativeModules,
+  ActivityIndicator,
 } from 'react-native';
 import EMIReminder from '../../../services/EMIReminder';
 import React, { useEffect, useState } from 'react';
@@ -22,6 +23,10 @@ import {
   moderateScale,
 } from '../../../utils/responsive';
 import { COLORS, FONTS, SIZES } from '../../../constants';
+import RazorpayCheckout from 'react-native-razorpay';
+import axios from 'axios';
+import { BASE_API_URL } from '../../../services/axios/api';
+import MaterialIcons from '@react-native-vector-icons/material-icons';
 
 const UserDashboard = ({ navigation }) => {
   const { user } = useSelector(state => state.auth);
@@ -78,6 +83,126 @@ const UserDashboard = ({ navigation }) => {
       ],
       { cancelable: true },
     );
+  };
+
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
+  const handlePayment = async () => {
+    const loanId = homeData?.loanId;
+    const amount = homeData?.amount;
+
+    if (!loanId || !amount || amount <= 0) {
+      Alert.alert('Error', 'Invalid loan data or amount. Please try again.');
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+
+      // 1. Create Order on Backend
+      const orderResponse = await axios.post(
+        `${BASE_API_URL}payment/create-order`,
+        {
+          loanId: loanId,
+        },
+      );
+
+      if (!orderResponse.data.success) {
+        throw new Error(orderResponse.data.message || 'Failed to create order');
+      }
+
+      const orderData = orderResponse.data.order;
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        description: 'EMI Payment',
+        image: 'https://vlocker.app/logo.png', // Replace with actual logo
+        currency: 'INR',
+        key: 'rzp_test_S8rAkegpLCFP7n',
+        amount: orderData.amount,
+        name: 'V-Locker',
+        order_id: orderData.id,
+        prefill: {
+          email: user?.email || 'customer@vlocker.com',
+          contact: user?.mobileNumber || '', // Assuming access to mobile number
+          name: user?.name || 'Customer',
+        },
+        theme: { color: COLORS.primary },
+      };
+
+      RazorpayCheckout.open(options)
+        .then(async data => {
+          // 3. Verify Payment on Backend
+          const verifyResponse = await axios.post(
+            `${BASE_API_URL}payment/verify-payment`,
+            {
+              razorpay_order_id: data.razorpay_order_id,
+              razorpay_payment_id: data.razorpay_payment_id,
+              razorpay_signature: data.razorpay_signature,
+              loanId: loanId,
+            },
+          );
+
+          if (verifyResponse.data.success) {
+            Alert.alert(
+              'Success',
+              'Payment verified successfully! Your status will terminate shortly.',
+            );
+            // Refresh data
+            dispatch(getHomeThunk());
+          } else {
+            Alert.alert('Payment Failure', 'Verification failed on server.');
+          }
+        })
+        .catch(error => {
+          console.log('Razorpay Error:', error);
+          if (error.code !== 2) {
+            // Check for user cancellation (code 2)
+            let displayMessage = '';
+
+            if (typeof error === 'object' && error !== null) {
+              const description =
+                error.description ||
+                (error.error && typeof error.error === 'object'
+                  ? error.error.description
+                  : null);
+
+              if (
+                description &&
+                description !== 'undefined' &&
+                typeof description === 'string'
+              ) {
+                displayMessage = description;
+              } else if (error.reason && typeof error.reason === 'string') {
+                displayMessage = error.reason.replace(/_/g, ' ');
+              }
+            }
+
+            // Fallback if no clean message was found
+            if (
+              !displayMessage ||
+              displayMessage.includes('{') ||
+              displayMessage.toLowerCase() === 'undefined'
+            ) {
+              displayMessage = 'Payment failed. Please try again.';
+            }
+
+            // Capitalize first letter
+            displayMessage =
+              displayMessage.charAt(0).toUpperCase() + displayMessage.slice(1);
+
+            Alert.alert('Payment Status', displayMessage);
+          }
+        });
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        'Error processing payment';
+      Alert.alert('Error', errorMsg);
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
   const handleUninstall = () => {
@@ -201,6 +326,45 @@ const UserDashboard = ({ navigation }) => {
                   View Installments Only
                 </MainText>
               </TouchableOpacity>
+
+              {/* Pay Now Button */}
+              {homeData?.amount && Number(homeData.amount) > 0 && (
+                <TouchableOpacity
+                  style={{
+                    marginTop: verticalScale(10),
+                    backgroundColor: COLORS.success,
+                    padding: moderateScale(10),
+                    borderRadius: moderateScale(8),
+                    alignItems: 'center',
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                  }}
+                  onPress={handlePayment}
+                  disabled={paymentLoading}
+                >
+                  {paymentLoading ? (
+                    <ActivityIndicator color={COLORS.white} size="small" />
+                  ) : (
+                    <>
+                      <MaterialIcons
+                        name="payment"
+                        size={20}
+                        color={COLORS.white}
+                        style={{ marginRight: 5 }}
+                      />
+                      <MainText
+                        style={{
+                          color: COLORS.white,
+                          fontFamily: FONTS.bold,
+                          fontSize: fontSize(14),
+                        }}
+                      >
+                        PAY NOW
+                      </MainText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ) : (
