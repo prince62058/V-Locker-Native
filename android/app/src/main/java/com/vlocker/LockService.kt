@@ -9,6 +9,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -102,6 +103,7 @@ class LockService : Service() {
                 if (isRunning) {
                     checkLockStatus()
                     ensureNetworkHealth()
+                    checkPeriodicVoiceReminder()
                     handler.postDelayed(this, CHECK_INTERVAL)
                 }
             }
@@ -139,9 +141,23 @@ class LockService : Service() {
 
                     if (jsonResponse.getBoolean("success")) {
                         val status = jsonResponse.getString("status")
+
+                        // Cache nextDueDate if present
+                        if (jsonResponse.has("nextDueDate")) {
+                            val nextDue = jsonResponse.getString("nextDueDate")
+                            if (nextDue != "null" && nextDue.isNotEmpty()) {
+                                sharedPref.edit().putString("next_due_date", nextDue).apply()
+                                Log.d("LockService", "Cached next_due_date: $nextDue")
+                            }
+                        } else if (jsonResponse.has("data") && jsonResponse.getJSONObject("data").has("nextDueDate")) {
+                            val nextDue = jsonResponse.getJSONObject("data").getString("nextDueDate")
+                             if (nextDue != "null" && nextDue.isNotEmpty()) {
+                                sharedPref.edit().putString("next_due_date", nextDue).apply()
+                                Log.d("LockService", "Cached next_due_date (from data): $nextDue")
+                            }
+                        }
                         
                         // Handle lock/unlock
-                        val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
                         val lastStatus = sharedPref.getString("last_status", "UNLOCKED")
                         
                         // Save new status
@@ -188,14 +204,42 @@ class LockService : Service() {
                     }
                 } else {
                     Log.e("LockService", "API Error: Response code $responseCode")
-                    applyCachedPolicy()
+                    handleOfflineStatus(sharedPref)
                 }
                 connection.disconnect()
             } catch (e: Exception) {
                 Log.e("LockService", "Error checking lock status: ${e.message}")
-                applyCachedPolicy()
+                val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                handleOfflineStatus(sharedPref)
             }
         }.start()
+    }
+
+    private fun handleOfflineStatus(sharedPref: SharedPreferences) {
+        val cachedNextDue = sharedPref.getString("next_due_date", "")
+        if (!cachedNextDue.isNullOrEmpty()) {
+            try {
+                // Parse ISO 8601 date
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val dueDate = sdf.parse(cachedNextDue)
+                val now = java.util.Date()
+
+                if (dueDate != null && now.after(dueDate)) {
+                    Log.w("LockService", "OFFLINE LOCK TRIGGERED: Current time $now is after due date $dueDate")
+                    enforceLock()
+                } else {
+                    Log.d("LockService", "Offline: Still within grace period. Next due: $cachedNextDue")
+                    applyCachedPolicy()
+                }
+            } catch (e: Exception) {
+                Log.e("LockService", "Error parsing cached next_due_date: ${e.message}")
+                applyCachedPolicy()
+            }
+        } else {
+            Log.d("LockService", "Offline: No cached next_due_date found.")
+            applyCachedPolicy()
+        }
     }
 
     private fun enforceLock() {
@@ -261,6 +305,40 @@ class LockService : Service() {
             }
         } catch (e: Exception) {
             Log.e("LockService", "Error ensuring network health: ${e.message}")
+        }
+    }
+
+    private fun checkPeriodicVoiceReminder() {
+        try {
+            val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val lastStatus = sharedPref.getString("last_status", "UNLOCKED")
+            
+            if (lastStatus == "LOCKED") {
+                val lastReminderTime = sharedPref.getLong("last_voice_reminder_time", 0L)
+                val currentTime = System.currentTimeMillis()
+                val sixHoursInMillis = 6 * 60 * 60 * 1000L
+                
+                if (currentTime - lastReminderTime >= sixHoursInMillis) {
+                    Log.d("LockService", "Persistent Overdue Reminder: Playing voice alert.")
+                    playVoiceReminder()
+                    sharedPref.edit().putLong("last_voice_reminder_time", currentTime).apply()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LockService", "Error in periodic voice reminder: ${e.message}")
+        }
+    }
+
+    private fun playVoiceReminder() {
+        try {
+            val voiceIntent = Intent(this, EMIReminderService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(voiceIntent)
+            } else {
+                startService(voiceIntent)
+            }
+        } catch (e: Exception) {
+            Log.e("LockService", "Failed to start EMIReminderService: ${e.message}")
         }
     }
 
@@ -442,6 +520,18 @@ class LockService : Service() {
                     } else {
                         startService(wallpaperIntent)
                     }
+                }
+            }
+
+            // Handle voice reminder policy
+            if (policy.has("isVoiceReminderEnabled")) {
+                val isVoiceEnabled = policy.getBoolean("isVoiceReminderEnabled")
+                if (isVoiceEnabled) {
+                    Log.d("LockService", "Starting EMIReminderService (Voice Alert) from Policy")
+                    playVoiceReminder()
+                    // Update last reminder time to avoid double play immediately
+                    val sharedPref = applicationContext.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+                    sharedPref.edit().putLong("last_voice_reminder_time", System.currentTimeMillis()).apply()
                 }
             }
         } catch (e: Exception) {

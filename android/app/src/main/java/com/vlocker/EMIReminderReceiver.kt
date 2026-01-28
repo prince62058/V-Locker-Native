@@ -14,11 +14,14 @@ class EMIReminderReceiver : BroadcastReceiver() {
             } else {
                 context.startService(serviceIntent)
             }
+        } else if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            val sharedPref = context.getSharedPreferences("VLockerPrefs", Context.MODE_PRIVATE)
+            val dueDateTimestamp = sharedPref.getLong("emi_due_date_timestamp", 0L)
             
-            // Here we could also reschedule the next alarm if we were using setExact 
-            // and wanted to manually handle the repeating logic, 
-            // but for now we assume the module schedules it or it's daily.
+            if (dueDateTimestamp > 0L) {
+                android.util.Log.d("EMIReminderReceiver", "Device rebooted. Rescheduling EMI reminders for $dueDateTimestamp")
+                EMIReminderModule.scheduleAllReminders(context, dueDateTimestamp)
+            }
         }
-        // Boot handling will be added later or integrated here if we persist the schedule
     }
 }

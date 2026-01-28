@@ -35,6 +35,7 @@ export const foregroundMessage = () => {
     if (message?.data?.type === 'LOCK') {
       await AsyncStorage.setItem('DEVICE_LOCK_STATUS', 'LOCKED');
       KioskModule.enableKioskMode();
+      DeviceLockService.checkLockStatus();
       DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' });
       console.log('Foreground: Device Locked via FCM');
     } else if (message?.data?.type === 'UNLOCK') {

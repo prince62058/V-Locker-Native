@@ -11,7 +11,11 @@ import {
   DeviceEventEmitter,
   ScrollView,
   NativeModules,
+  Alert,
 } from 'react-native';
+import RazorpayCheckout from 'react-native-razorpay';
+import axios from 'axios';
+import { BASE_API_URL } from '../services/axios/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import DeviceInfo from 'react-native-device-info';
@@ -25,8 +29,11 @@ const { KioskModule } = NativeModules;
 const DeviceLockScreen = () => {
   const dispatch = useDispatch();
   const [emiAmount, setEmiAmount] = useState(null);
+  const [loanId, setLoanId] = useState(null);
+  const [customerInfo, setCustomerInfo] = useState({ name: '', email: '' });
   const [deviceImei, setDeviceImei] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Disable Back Button & Enable Kiosk Mode
   useEffect(() => {
@@ -103,12 +110,19 @@ const DeviceLockScreen = () => {
               loan._id,
             );
             setEmiAmount(amountToShow);
+            setLoanId(loan._id);
+            setCustomerInfo({
+              name: loan.customerId?.customerName || 'Customer',
+              email: loan.customerId?.customerEmail || 'customer@vlocker.com',
+            });
           } else {
             console.log('DeviceLockScreen: No loan data found in result');
           }
         }
       } catch (error) {
-        console.error('Error fetching loan data:', error);
+        console.error('Error fetching loan data (offline):', error);
+        // If error/offline, we still keep the screen red and locked.
+        // We could show a specific offline message if we want.
       } finally {
         setLoading(false);
       }
@@ -122,6 +136,120 @@ const DeviceLockScreen = () => {
     }, 10000);
     return () => clearInterval(interval);
   }, [dispatch]);
+
+  const handlePayment = async () => {
+    if (!loanId || emiAmount <= 0) {
+      Alert.alert('Error', 'Invalid loan data or amount. Please try again.');
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+
+      // 1. Create Order on Backend
+      const orderResponse = await axios.post(
+        `${BASE_API_URL}payment/create-order`,
+        {
+          loanId: loanId,
+        },
+      );
+
+      if (!orderResponse.data.success) {
+        throw new Error(orderResponse.data.message || 'Failed to create order');
+      }
+
+      const orderData = orderResponse.data.order;
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        description: 'EMI Payment',
+        image: 'https://vlocker.app/logo.png', // Replace with actual logo
+        currency: 'INR',
+        key: 'rzp_test_S8rAkegpLCFP7n',
+        amount: orderData.amount,
+        name: 'V-Locker',
+        order_id: orderData.id,
+        prefill: {
+          email: customerInfo.email,
+          contact: '', // Optional
+          name: customerInfo.name,
+        },
+        theme: { color: '#B00020' },
+      };
+
+      RazorpayCheckout.open(options)
+        .then(async data => {
+          // 3. Verify Payment on Backend
+          const verifyResponse = await axios.post(
+            `${BASE_API_URL}payment/verify-payment`,
+            {
+              razorpay_order_id: data.razorpay_order_id,
+              razorpay_payment_id: data.razorpay_payment_id,
+              razorpay_signature: data.razorpay_signature,
+              loanId: loanId,
+            },
+          );
+
+          if (verifyResponse.data.success) {
+            Alert.alert(
+              'Success',
+              'Payment verified successfully! Your device will unlock shortly.',
+            );
+            // Refresh logic will take care of unlocking
+          } else {
+            Alert.alert('Payment Failure', 'Verification failed on server.');
+          }
+        })
+        .catch(error => {
+          console.log('Razorpay Error:', error);
+          if (error.code !== 2) {
+            // Check for user cancellation (code 2)
+            let displayMessage = '';
+
+            if (typeof error === 'object' && error !== null) {
+              const description =
+                error.description ||
+                (error.error && typeof error.error === 'object'
+                  ? error.error.description
+                  : null);
+
+              if (
+                description &&
+                description !== 'undefined' &&
+                typeof description === 'string'
+              ) {
+                displayMessage = description;
+              } else if (error.reason && typeof error.reason === 'string') {
+                displayMessage = error.reason.replace(/_/g, ' ');
+              }
+            }
+
+            // Fallback if no clean message was found or if it looks like technical output
+            if (
+              !displayMessage ||
+              displayMessage.includes('{') ||
+              displayMessage.toLowerCase() === 'undefined'
+            ) {
+              displayMessage = 'Payment failed. Please try again.';
+            }
+
+            // Capitalize first letter
+            displayMessage =
+              displayMessage.charAt(0).toUpperCase() + displayMessage.slice(1);
+
+            Alert.alert('Payment Status', displayMessage);
+          }
+        });
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        'Error processing payment';
+      Alert.alert('Error', errorMsg);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const handleWhatsApp = () => {
     const phone = '916205872519';
@@ -262,19 +390,25 @@ const DeviceLockScreen = () => {
         </Text>
       </ScrollView>
 
-      {/* Bottom Action Button */}
       <View style={styles.bottomContainer}>
         <TouchableOpacity
-          style={styles.whatsappButton}
-          onPress={handleWhatsApp}
+          style={styles.payNowButton}
+          onPress={handlePayment}
+          disabled={paymentLoading}
         >
-          <Ionicons
-            name="logo-whatsapp"
-            size={24}
-            color="#fff"
-            style={{ marginRight: 10 }}
-          />
-          <Text style={styles.whatsappButtonText}>CONTACT ON WHATSAPP</Text>
+          {paymentLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <MaterialIcons
+                name="payment"
+                size={24}
+                color="#fff"
+                style={{ marginRight: 10 }}
+              />
+              <Text style={styles.whatsappButtonText}>PAY NOW</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -423,8 +557,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
-  whatsappButton: {
-    backgroundColor: '#25D366',
+  payNowButton: {
+    backgroundColor: '#B00020',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
