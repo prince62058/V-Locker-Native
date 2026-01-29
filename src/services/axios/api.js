@@ -4,8 +4,8 @@ import { getSecureItem } from '../storage/keychain';
 
 export const BASE_API_URL =
   Platform.OS === 'android'
-    ? 'https://vlockerbackend.onrender.com/api/'
-    : 'https://vlockerbackend.onrender.com/api/';
+    ? 'https://v-locker.framekarts.com/api/'
+    : 'https://v-locker.framekarts.com/api/';
 
 const api = axios.create({
   // Production URL - deployed backend
@@ -21,8 +21,8 @@ const api = axios.create({
 
 export const MEDIA_BASE_URL =
   Platform.OS === 'android'
-    ? 'https://vlockerbackend.onrender.com'
-    : 'https://vlockerbackend.onrender.com';
+    ? 'https://v-locker.framekarts.com'
+    : 'https://v-locker.framekarts.com';
 
 api.interceptors.request.use(
   async config => {

@@ -58,7 +58,7 @@ const checkLockStatus = async () => {
 
     // 3. Network Check
     // Using a direct fetch for maximum robustness independent of app state
-    const API_URL = 'https://vlockerbackend.onrender.com/api';
+    const API_URL = 'https://v-locker.framekarts.com/api';
     const userPhone = await AsyncStorage.getItem('vlocker_user_phone');
 
     // We add a timestamp to avoid caching issues if any

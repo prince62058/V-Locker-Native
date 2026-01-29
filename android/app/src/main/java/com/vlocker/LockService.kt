@@ -121,7 +121,7 @@ class LockService : Service() {
                 Log.d("LockService", "Checking lock status for device: $deviceId, fallback phone: $loanPhone")
 
                 // Make API call
-                var apiUrl = "https://vlockerbackend.onrender.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
+                var apiUrl = "https://v-locker.framekarts.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
                 if (!loanPhone.isNullOrEmpty()) {
                     apiUrl += "&phone=$loanPhone"
                 }

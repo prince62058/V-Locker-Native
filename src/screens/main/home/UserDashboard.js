@@ -328,43 +328,46 @@ const UserDashboard = ({ navigation }) => {
               </TouchableOpacity>
 
               {/* Pay Now Button */}
-              {homeData?.amount && Number(homeData.amount) > 0 && (
-                <TouchableOpacity
-                  style={{
-                    marginTop: verticalScale(10),
-                    backgroundColor: COLORS.success,
-                    padding: moderateScale(10),
-                    borderRadius: moderateScale(8),
-                    alignItems: 'center',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                  }}
-                  onPress={handlePayment}
-                  disabled={paymentLoading}
-                >
-                  {paymentLoading ? (
-                    <ActivityIndicator color={COLORS.white} size="small" />
-                  ) : (
-                    <>
-                      <MaterialIcons
-                        name="payment"
-                        size={20}
-                        color={COLORS.white}
-                        style={{ marginRight: 5 }}
-                      />
-                      <MainText
-                        style={{
-                          color: COLORS.white,
-                          fontFamily: FONTS.bold,
-                          fontSize: fontSize(14),
-                        }}
-                      >
-                        PAY NOW
-                      </MainText>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
+              {homeData?.amount &&
+                Number(homeData.amount) > 0 &&
+                homeData?.status !== 'Overdue' &&
+                homeData?.status !== 'LOCKED' && (
+                  <TouchableOpacity
+                    style={{
+                      marginTop: verticalScale(10),
+                      backgroundColor: COLORS.success,
+                      padding: moderateScale(10),
+                      borderRadius: moderateScale(8),
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                    }}
+                    onPress={handlePayment}
+                    disabled={paymentLoading}
+                  >
+                    {paymentLoading ? (
+                      <ActivityIndicator color={COLORS.white} size="small" />
+                    ) : (
+                      <>
+                        <MaterialIcons
+                          name="payment"
+                          size={20}
+                          color={COLORS.white}
+                          style={{ marginRight: 5 }}
+                        />
+                        <MainText
+                          style={{
+                            color: COLORS.white,
+                            fontFamily: FONTS.bold,
+                            fontSize: fontSize(14),
+                          }}
+                        >
+                          PAY NOW
+                        </MainText>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
             </View>
           </View>
         ) : (
