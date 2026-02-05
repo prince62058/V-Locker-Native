@@ -54,7 +54,7 @@ const UserDashboard = ({ navigation }) => {
       if (homeData.status === 'Paid') {
         EMIReminder.stopReminder();
       } else if (homeData.nextDueDate && homeData.nextDueDate !== 'N/A') {
-        // Schedule reminder for the due date
+        // Schedule reminder for 5, 4, 3, 2 days before the due date
         // format is likely ISO or a string moment can parse.
         // EMIReminder.scheduleReminder expects a timestamp or Date object.
         const dueDate = moment(homeData.nextDueDate).toDate();

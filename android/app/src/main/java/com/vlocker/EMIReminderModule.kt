@@ -26,28 +26,33 @@ class EMIReminderModule(private val reactContext: ReactApplicationContext) : Rea
                 timeInMillis = dueDateTimestamp
             }
 
-            // Start 3 days before
-            val startDate = Calendar.getInstance().apply {
-                timeInMillis = dueDate.timeInMillis
-                add(Calendar.DAY_OF_YEAR, -3)
-            }
-
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            // Loop from -3 days to 0 days (4 days total)
-            for (i in 0..3) {
-                val checkDate = Calendar.getInstance().apply {
-                    timeInMillis = startDate.timeInMillis
-                    add(Calendar.DAY_OF_YEAR, i)
+            // Schedule notifications for 5, 4, 3, 2 days before due date (single notification at 9 AM)
+            val daysBeforeDue = listOf(5, 4, 3, 2)
+            for ((index, daysOffset) in daysBeforeDue.withIndex()) {
+                val notificationDate = Calendar.getInstance().apply {
+                    timeInMillis = dueDate.timeInMillis
+                    add(Calendar.DAY_OF_YEAR, -daysOffset)
                 }
                 
-                scheduleAlarmForTime(context, checkDate, 9, 0, alarmManager, i * 10 + 1)
-                scheduleAlarmForTime(context, checkDate, 19, 0, alarmManager, i * 10 + 2)
+                // Single notification at 9 AM
+                scheduleAlarmForTime(context, notificationDate, 9, 0, alarmManager, index + 1, "REMINDER")
             }
-            Log.d("EMIReminder", "Scheduled reminders for 3 days ending $dueDateTimestamp")
+
+            // Schedule automatic device lock for overdue date (day 0 at 00:01)
+            val overdueDate = Calendar.getInstance().apply {
+                timeInMillis = dueDate.timeInMillis
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 1)
+                set(Calendar.SECOND, 0)
+            }
+            scheduleAlarmForTime(context, overdueDate, 0, 1, alarmManager, 5, "LOCK")
+            
+            Log.d("EMIReminder", "Scheduled reminders for days -5, -4, -3, -2 and auto-lock for overdue date: $dueDateTimestamp")
         }
 
-        private fun scheduleAlarmForTime(context: Context, date: Calendar, hour: Int, minute: Int, alarmManager: AlarmManager, requestCode: Int) {
+        private fun scheduleAlarmForTime(context: Context, date: Calendar, hour: Int, minute: Int, alarmManager: AlarmManager, requestCode: Int, alarmType: String) {
             val alarmTime = Calendar.getInstance().apply {
                 timeInMillis = date.timeInMillis
                 set(Calendar.HOUR_OF_DAY, hour)
@@ -56,8 +61,14 @@ class EMIReminderModule(private val reactContext: ReactApplicationContext) : Rea
             }
 
             if (alarmTime.timeInMillis > System.currentTimeMillis()) {
+                val action = if (alarmType == "LOCK") {
+                    "com.vlocker.EMI_OVERDUE_LOCK"
+                } else {
+                    "com.vlocker.EMI_REMINDER_ALARM"
+                }
+                
                 val intent = Intent(context, EMIReminderReceiver::class.java).apply {
-                    action = "com.vlocker.EMI_REMINDER_ALARM"
+                    this.action = action
                 }
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
@@ -76,6 +87,7 @@ class EMIReminderModule(private val reactContext: ReactApplicationContext) : Rea
                     } else {
                         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alarmTime.timeInMillis, pendingIntent)
                     }
+                    Log.d("EMIReminder", "Scheduled $alarmType alarm for ${alarmTime.time} with requestCode $requestCode")
                 } catch (e: SecurityException) {
                     Log.e("EMIReminder", "SecurityException scheduling exact alarm: ${e.message}")
                 }
@@ -87,26 +99,40 @@ class EMIReminderModule(private val reactContext: ReactApplicationContext) : Rea
             sharedPref.edit().remove("emi_due_date_timestamp").apply()
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, EMIReminderReceiver::class.java).apply {
-                action = "com.vlocker.EMI_REMINDER_ALARM"
-            }
             
-            for (i in 0..3) {
-                for (slot in 1..2) {
-                    val requestCode = i * 10 + slot
-                    val pendingIntent = PendingIntent.getBroadcast(
-                        context,
-                        requestCode,
-                        intent,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
-                    )
-                    if (pendingIntent != null) {
-                        alarmManager.cancel(pendingIntent)
-                        pendingIntent.cancel()
-                    }
+            // Cancel all reminder alarms (requestCodes 1-4)
+            for (requestCode in 1..4) {
+                val reminderIntent = Intent(context, EMIReminderReceiver::class.java).apply {
+                    action = "com.vlocker.EMI_REMINDER_ALARM"
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    requestCode,
+                    reminderIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+                )
+                if (pendingIntent != null) {
+                    alarmManager.cancel(pendingIntent)
+                    pendingIntent.cancel()
                 }
             }
-            Log.d("EMIReminder", "Cleared all scheduled reminders")
+            
+            // Cancel lock alarm (requestCode 5)
+            val lockIntent = Intent(context, EMIReminderReceiver::class.java).apply {
+                action = "com.vlocker.EMI_OVERDUE_LOCK"
+            }
+            val lockPendingIntent = PendingIntent.getBroadcast(
+                context,
+                5,
+                lockIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+            )
+            if (lockPendingIntent != null) {
+                alarmManager.cancel(lockPendingIntent)
+                lockPendingIntent.cancel()
+            }
+            
+            Log.d("EMIReminder", "Cleared all scheduled reminders and lock alarms")
         }
     }
 

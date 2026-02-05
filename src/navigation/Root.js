@@ -135,6 +135,19 @@ const Root = () => {
             setIsLocked(true);
           }
         }
+
+        // Enable permanent protections (Factory Reset + Uninstall blocking)
+        if (KioskModule.enablePermanentProtections) {
+          try {
+            await KioskModule.enablePermanentProtections();
+            console.log('Root: Permanent protections enabled successfully');
+          } catch (protErr) {
+            console.log(
+              'Root: Failed to enable permanent protections:',
+              protErr,
+            );
+          }
+        }
       } catch (e) {
         console.warn('Root: Failed to init lock state from native:', e);
       }

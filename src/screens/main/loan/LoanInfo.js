@@ -256,13 +256,6 @@ const LoanInfo = ({ navigation, route }) => {
               </View>
             </ScrollView>
 
-            <View
-              style={{
-                height: SIZES.height * 0.1,
-                backgroundColor: COLORS.borderLight,
-              }}
-            ></View>
-
             {/* APPROVE / REJECT BUTTONS */}
             {loanDetails?.loanStatus === 'PENDING' &&
               user?.role === 'admin' && (

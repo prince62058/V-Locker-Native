@@ -32,9 +32,17 @@ const DeviceLockScreen = () => {
   const [loanId, setLoanId] = useState(null);
   const [customerInfo, setCustomerInfo] = useState({ name: '', email: '' });
   const [deviceImei, setDeviceImei] = useState(null);
+  const [loanImei, setLoanImei] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [shopName, setShopName] = useState('Satya Kabir E-solutions Pvt. Ltd.');
+  const [lockReason, setLockReason] = useState(null);
+  const [daysOverdue, setDaysOverdue] = useState(0);
+
+  // Support Info State
+  const [supportPhone, setSupportPhone] = useState('6205872519');
+  const [supportEmail, setSupportEmail] = useState('princekumar5252@gmail.com');
+  const [supportWhatsapp, setSupportWhatsapp] = useState('916205872519');
 
   // Disable Back Button & Enable Kiosk Mode
   useEffect(() => {
@@ -54,6 +62,30 @@ const DeviceLockScreen = () => {
     return () => {
       backHandler.remove();
     };
+  }, []);
+
+  // Fetch Company Support Info
+  useEffect(() => {
+    const fetchSupportInfo = async () => {
+      try {
+        const response = await axios.get(`${BASE_API_URL}company`);
+        if (response.data && response.data.success && response.data.data) {
+          const { companyMobile, supportEmail, whatsappNumber } =
+            response.data.data;
+          if (companyMobile) setSupportPhone(companyMobile);
+          if (supportEmail) setSupportEmail(supportEmail);
+          if (whatsappNumber) setSupportWhatsapp(whatsappNumber);
+          console.log(
+            'DeviceLockScreen: Company Info Fetched:',
+            response.data.data,
+          );
+        }
+      } catch (error) {
+        console.error('DeviceLockScreen: Error fetching company info:', error);
+      }
+    };
+
+    fetchSupportInfo();
   }, []);
 
   // Fetch Device Status & Due Amount
@@ -109,16 +141,44 @@ const DeviceLockScreen = () => {
               amountToShow,
               'from loan:',
               loan._id,
+              'Lock Reason:',
+              result.lockReason,
+              'Days Overdue:',
+              result.daysOverdue,
+              'Status:', // Log status
+              result.status || loan.status,
             );
             setEmiAmount(amountToShow);
             setLoanId(loan._id);
+            setLockReason(result.lockReason || null);
+            setDaysOverdue(result.daysOverdue || 0);
             setCustomerInfo({
               name: loan.customerId?.customerName || 'Customer',
               email: loan.customerId?.customerEmail || 'customer@vlocker.com',
             });
             setShopName(loan.shopName || 'Satya Kabir E-solutions Pvt. Ltd.');
+            setLoanImei(loan.imeiNumber1 || loan.imeiNumber2 || null);
+
+            // Emit Status to Root.js strictly based on API
+            const currentStatus = result.status || loan.status;
+            if (currentStatus === 'UNLOCKED') {
+              console.log(
+                'DeviceLockScreen: Status is UNLOCKED. Emitting unlock event.',
+              );
+              DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', {
+                status: 'UNLOCKED',
+              });
+            } else {
+              // Only emit LOCKED if we are sure it's locked.
+              // This refreshes the lock state in Root.js
+              DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', {
+                status: 'LOCKED',
+              });
+            }
           } else {
             console.log('DeviceLockScreen: No loan data found in result');
+            // If we have result but no loan data, ambiguous. Ideally don't force lock unless we know.
+            // But if we are here, we are on Lock Screen.
           }
         }
       } catch (error) {
@@ -134,7 +194,7 @@ const DeviceLockScreen = () => {
 
     const interval = setInterval(() => {
       fetchLoanData();
-      DeviceEventEmitter.emit('LOCK_STATUS_CHANGED', { status: 'LOCKED' });
+      // Moved emission logic inside fetchLoanData to prevent overriding actual status
     }, 10000);
     return () => clearInterval(interval);
   }, [dispatch]);
@@ -254,21 +314,20 @@ const DeviceLockScreen = () => {
   };
 
   const handleWhatsApp = () => {
-    const phone = '916205872519';
     const message = `Hello, my device (IMEI: ${deviceImei}) is locked. I want to pay my EMI of ₹${emiAmount}.`;
-    Linking.openURL(`whatsapp://send?phone=${phone}&text=${message}`).catch(
-      () => {
-        Linking.openURL(`https://wa.me/${phone}?text=${message}`);
-      },
-    );
+    Linking.openURL(
+      `whatsapp://send?phone=${supportWhatsapp}&text=${message}`,
+    ).catch(() => {
+      Linking.openURL(`https://wa.me/${supportWhatsapp}?text=${message}`);
+    });
   };
 
   const handleCall = () => {
-    Linking.openURL('tel:6205872519');
+    Linking.openURL(`tel:${supportPhone}`);
   };
 
   const handleEmail = () => {
-    Linking.openURL('mailto:princekumar5252@gmail.com');
+    Linking.openURL(`mailto:${supportEmail}`);
   };
 
   const handleOpenWifi = () => {
@@ -319,10 +378,29 @@ const DeviceLockScreen = () => {
         {/* Warning Message */}
         <View style={styles.warningBox}>
           <Text style={styles.warningText}>
-            Your device has been locked because your EMI is OVERDUE. Please pay
-            your outstanding dues immediately to restore access.
+            {lockReason === 'AUTO_LOCK_OVERDUE'
+              ? `Your device has been automatically locked because your EMI payment is ${daysOverdue} day${
+                  daysOverdue !== 1 ? 's' : ''
+                } overdue. Please pay your outstanding dues immediately to restore access.`
+              : lockReason === 'GRACE_PERIOD_ACTIVE'
+              ? `Your EMI payment is ${daysOverdue} day${
+                  daysOverdue !== 1 ? 's' : ''
+                } overdue. Please pay soon to avoid automatic device lock.`
+              : lockReason === 'MANUAL_LOCK'
+              ? 'Your device has been locked by the administrator. Please contact support or pay your dues to unlock.'
+              : 'Your device has been locked because your EMI is OVERDUE. Please pay your outstanding dues immediately to restore access.'}
           </Text>
         </View>
+
+        {/* Days Overdue Badge (only show if overdue) */}
+        {daysOverdue > 0 && (
+          <View style={styles.overdueBadge}>
+            <MaterialIcons name="warning" size={20} color="#D32F2F" />
+            <Text style={styles.overdueBadgeText}>
+              {daysOverdue} Day{daysOverdue !== 1 ? 's' : ''} Overdue
+            </Text>
+          </View>
+        )}
 
         {/* Company Branding */}
         <View style={styles.brandingContainer}>
@@ -342,7 +420,7 @@ const DeviceLockScreen = () => {
             </View>
             <View>
               <Text style={styles.contactLabel}>Phone</Text>
-              <Text style={styles.contactValue}>6205872519</Text>
+              <Text style={styles.contactValue}>{supportPhone}</Text>
             </View>
           </TouchableOpacity>
 
@@ -352,7 +430,7 @@ const DeviceLockScreen = () => {
             </View>
             <View>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>princekumar5252@gmail.com</Text>
+              <Text style={styles.contactValue}>{supportEmail}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -386,7 +464,7 @@ const DeviceLockScreen = () => {
 
         {/* Footer Info */}
         <Text style={styles.footerInfo}>
-          Device IMEI: {deviceImei || 'Loading...'}
+          Device IMEI: {loanImei || deviceImei || 'Loading...'}
         </Text>
       </ScrollView>
 
@@ -593,6 +671,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     fontStyle: 'italic',
+  },
+  overdueBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    borderColor: '#D32F2F',
+    marginBottom: 20,
+  },
+  overdueBadgeText: {
+    color: '#D32F2F',
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginLeft: 8,
   },
 });
 

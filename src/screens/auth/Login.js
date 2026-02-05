@@ -1,4 +1,4 @@
- import { useState } from 'react';
+import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -42,7 +42,9 @@ const Login = ({ navigation }) => {
         return;
       }
       setLocalLoading(true);
-      const response = await dispatch(loginUser({ email, password }));
+      const response = await dispatch(
+        loginUser({ email: email.trim(), password: password.trim() }),
+      );
       setLocalLoading(false);
       // Navigation handled by Redux state change (Root.js listens to token)
       if (loginUser.rejected.match(response)) {

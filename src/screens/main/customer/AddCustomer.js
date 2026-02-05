@@ -24,6 +24,8 @@ import {
 } from '../../../redux/slices/main/customerSlice';
 import { pickImage } from '../../../services/picker/cropImagePicker';
 
+const logo = require('../../../assets/images/VLOGO.png');
+
 const AddCustomer = ({ navigation }) => {
   const dispatch = useDispatch();
   const { loading, customerData } = useSelector(state => state.customer);
@@ -106,12 +108,14 @@ const AddCustomer = ({ navigation }) => {
           </MainText>
 
           <Pressable style={styles.profileImage} onPress={handleImageSelect}>
-            {form.profileUrl && (
-              <Image
-                source={{ uri: form.profileUrl?.uri || form?.profileUrl }}
-                style={{ width: '100%', height: '100%', borderRadius: 100 }}
-              />
-            )}
+            <Image
+              source={
+                form.profileUrl
+                  ? { uri: form.profileUrl?.uri || form?.profileUrl }
+                  : logo
+              }
+              style={{ width: '100%', height: '100%', borderRadius: 100 }}
+            />
             <Image
               source={require('../profile/image.png')}
               style={styles.editIcon}

@@ -71,7 +71,7 @@ const CustomerCard = ({
         <View>
           <Image
             style={styles.profile}
-            source={profileUri ? { uri: profileUri } : images.userProfile}
+            source={profileUri ? { uri: profileUri } : images.defaultUser}
           />
           <Pressable style={styles.editView} onPress={onEdit}>
             <Image style={styles.editIcon} source={icons.edit} />

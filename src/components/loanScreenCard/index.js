@@ -5,20 +5,34 @@ import { COLORS, icons, SIZES } from '../../constants';
 import MainText from '../MainText';
 import { getStatusStyle } from '../../utils/getStyle';
 import { maskId } from '../../utils/formating/string';
+import { MEDIA_BASE_URL } from '../../services/axios/api';
 
 const LoanScreenCard = ({ item, onPress }) => {
   const statusStyle = getStatusStyle(item?.loanStatus);
+  console.log(
+    'LoanCard:',
+    item?.customerId?.customerName,
+    item?.customerId?.profileUrl,
+  );
 
   return (
     <Pressable style={styles.customView} onPress={onPress}>
       {/* Top Section */}
-      <View style={[styles.flex, { justifyContent: 'space-between' }]}>
-        <View style={styles.leftSection}>
+      <View
+        style={[
+          styles.flex,
+          {
+            justifyContent: 'space-between',
+            marginBottom: SIZES.height * 0.014,
+          },
+        ]}
+      >
+        <View style={styles.flex}>
           <Image
             style={styles.profile}
             source={
               item?.customerId?.profileUrl
-                ? { uri: item?.customerId?.profileUrl }
+                ? { uri: `${MEDIA_BASE_URL}${item.customerId.profileUrl}` }
                 : null
             }
           />
@@ -30,10 +44,10 @@ const LoanScreenCard = ({ item, onPress }) => {
               {item?.customerId?.customerMobileNumber}
             </MainText>
           </View>
-          <View style={styles.loanSection}>
-            <MainText style={styles.idText}>LOAN ID</MainText>
-            <MainText style={styles.text}>{maskId(item?._id)}</MainText>
-          </View>
+        </View>
+        <View style={styles.loanSection}>
+          <MainText style={styles.idText}>LOAN ID</MainText>
+          <MainText style={styles.text}>{maskId(item?._id)}</MainText>
         </View>
       </View>
 

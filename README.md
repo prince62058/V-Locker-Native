@@ -2,6 +2,20 @@
 
 The V-Locker Mobile Application is designed for customers and dealers to manage device financing and security. It includes features for EMI tracking, device locking/unlocking (Kiosk Mode), and real-time notifications.
 
+## Recent Fixes & Improvements (Jan 2026)
+
+### 🤖 Native Modules (Kotlin)
+- [x] **Strict Security Implementations (`LockService.kt`)**: 
+    - Implemented `setControlDisabledPackages` to prevent force-stopping the app.
+    - Added policies to block changes to Mobile Data and Wi-Fi.
+- [x] **Auto-Revert Logic**: Added background service in Kotlin to monitor and revert Airplane Mode (to OFF) and Wi-Fi (to ON) instantly if changed by user.
+- [x] **Device Admin**: Enhanced `MyDeviceAdminReceiver` for robust kiosk mode enforcement.
+
+### 📱 React Native UI/UX
+- [x] **Profile Picture**: Fixed display issue by ensuring absolute URLs are used.
+- [x] **Lock Screen UI**: Fixed issue where EMI Due Amount was not visible.
+- [x] **Auto-Lock Service**: Improved logic for reliability.
+
 ## Features
 
 - **Device Locking (Kiosk Mode)**: Secures financed devices, preventing unauthorized use if payments are missed. Includes `MyDeviceAdminReceiver` for admin privileges.

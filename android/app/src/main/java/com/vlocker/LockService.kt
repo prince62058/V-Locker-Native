@@ -121,7 +121,7 @@ class LockService : Service() {
                 Log.d("LockService", "Checking lock status for device: $deviceId, fallback phone: $loanPhone")
 
                 // Make API call
-                var apiUrl = "https://v-locker.framekarts.com/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
+                var apiUrl = "https://api.vlocker.in/api/customerLoan/status/public?imei=$deviceId&t=${System.currentTimeMillis()}"
                 if (!loanPhone.isNullOrEmpty()) {
                     apiUrl += "&phone=$loanPhone"
                 }
@@ -179,10 +179,10 @@ class LockService : Service() {
                             }
                         } else {
                             // Status is same, ensure lock is held if needed
-                             if (status == "LOCKED") {
-                                // Ensure app is in front, but don't re-enforce kiosk/policies
-                                // bringAppToFront() - REMOVED to prevent restart loop
-                             }
+                            if (status == "LOCKED") {
+                                // Ensure app is in front
+                                bringAppToFront()
+                            }
                         }
 
                         // Handle policies if changed

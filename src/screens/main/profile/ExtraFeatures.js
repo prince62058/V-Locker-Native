@@ -35,6 +35,17 @@ const FeatureRow = ({ title, icon, onPress, color = COLORS.primary }) => (
 );
 
 const ExtraFeatures = ({ navigation }) => {
+  // Track visibility state for each app (false = visible/green, true = hidden/red)
+  const [appStates, setAppStates] = useState({
+    'com.whatsapp': false,
+    'com.instagram.android': false,
+    'com.snapchat.android': false,
+    'com.google.android.youtube': false,
+    'com.facebook.katana': false,
+    'com.android.vending': false,
+    'com.android.chrome': false,
+  });
+
   const handleDisableReset = async () => {
     try {
       await KioskModule.setFactoryResetAllowed(false);
@@ -129,7 +140,7 @@ const ExtraFeatures = ({ navigation }) => {
           </MainText>
           <View style={styles.noteBox}>
             <MainText style={styles.noteText}>
-              Note: These settings apply only to this device.
+              Red = Hidden, Green = Visible. Tap to toggle.
             </MainText>
           </View>
 
@@ -141,33 +152,52 @@ const ExtraFeatures = ({ navigation }) => {
             { title: 'Hide Facebook', pkg: 'com.facebook.katana' },
             { title: 'Hide Play Store', pkg: 'com.android.vending' },
             { title: 'Hide Chrome', pkg: 'com.android.chrome' },
-          ].map((app, index) => (
-            <FeatureRow
-              key={index}
-              title={app.title}
-              icon={icons.support}
-              color={COLORS.primary}
-              onPress={() => {
-                Alert.alert(
-                  'App Restriction',
-                  `Hide ${app.title.split(' ')[1]}?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Show',
-                      onPress: () =>
-                        KioskModule.setApplicationHidden(app.pkg, false),
-                    },
-                    {
-                      text: 'Hide',
-                      onPress: () =>
-                        KioskModule.setApplicationHidden(app.pkg, true),
-                    },
-                  ],
-                );
-              }}
-            />
-          ))}
+          ].map((app, index) => {
+            const isHidden = appStates[app.pkg];
+            return (
+              <FeatureRow
+                key={index}
+                title={app.title}
+                icon={icons.support}
+                color={isHidden ? COLORS.red : COLORS.green}
+                onPress={() => {
+                  const appName = app.title.split(' ')[1];
+                  Alert.alert(
+                    'App Restriction',
+                    `${appName} is currently ${
+                      isHidden ? 'HIDDEN' : 'VISIBLE'
+                    }`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: isHidden ? 'Show' : 'Hide',
+                        onPress: async () => {
+                          try {
+                            await KioskModule.setApplicationHidden(
+                              app.pkg,
+                              !isHidden,
+                            );
+                            setAppStates(prev => ({
+                              ...prev,
+                              [app.pkg]: !isHidden,
+                            }));
+                            Alert.alert(
+                              'Success',
+                              `${appName} is now ${
+                                !isHidden ? 'HIDDEN' : 'VISIBLE'
+                              }`,
+                            );
+                          } catch (e) {
+                            Alert.alert('Error', e.message);
+                          }
+                        },
+                      },
+                    ],
+                  );
+                }}
+              />
+            );
+          })}
         </View>
       </ScrollView>
     </MainView>

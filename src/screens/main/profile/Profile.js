@@ -46,14 +46,13 @@ const Profile = ({ navigation }) => {
           <View style={styles.profileSection}>
             <Image
               style={styles.profile}
-              source={profileUri ? { uri: profileUri } : images.userProfile}
+              source={profileUri ? { uri: profileUri } : images.defaultUser}
             />
 
             <View style={styles.nameSection}>
               <MainText style={styles.boldText}>{user?.name}</MainText>
 
               <View style={styles.flex}>
-                <Image style={styles.allIcon} source={icons.telephone} />
                 <MainText style={styles.normalText}>{user?.phone}</MainText>
               </View>
 
@@ -74,12 +73,7 @@ const Profile = ({ navigation }) => {
             subtitle="Edit your Profile."
             onPress={() => navigation.navigate('EditProfile')}
           />
-          <ProfileCard
-            icon={icons.businessProfile}
-            title="Business Profile"
-            subtitle="Edit your Business Profile."
-            onPress={() => navigation.navigate('BusinessProfile')}
-          />
+
           <ProfileCard
             icon={icons.appLock}
             title="App Lock"

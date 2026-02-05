@@ -134,6 +134,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_BLUETOOTH)
                 dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_CONFIG_WIFI)
                 
+                // Note: DISALLOW_FACTORY_RESET and DISALLOW_APPS_CONTROL remain active for permanent protection
+                
                 // 2. Default Features
                 dpm.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
                 dpm.setStatusBarDisabled(adminComponent, false)
@@ -373,6 +375,31 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             promise.resolve(true)
         }
     }
+    @ReactMethod
+    fun enablePermanentProtections(promise: Promise) {
+        try {
+            if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                // 1. Permanent Factory Reset Protection
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_FACTORY_RESET)
+                
+                // 2. Permanent Uninstall Protection
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_UNINSTALL_APPS)
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_APPS_CONTROL)
+                
+                // 3. Block uninstall of VLocker itself
+                dpm.setUninstallBlocked(adminComponent, reactApplicationContext.packageName, true)
+                
+                android.util.Log.d("KioskModule", "Permanent protections enabled: Factory Reset + Uninstall blocked")
+                promise.resolve(true)
+            } else {
+                promise.reject("NOT_OWNER", "App is not Device Owner")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Error enabling permanent protections: " + e.message)
+            promise.reject("ERROR", e.message)
+        }
+    }
+
     @ReactMethod
     fun setFactoryResetAllowed(allowed: Boolean, promise: Promise) {
         try {

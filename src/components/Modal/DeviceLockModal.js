@@ -41,7 +41,7 @@ const DeviceLockModal = ({
       const res = await postMediaApi('upload', { file: image });
       console.log('Upload success:', res.data);
 
-      const imageUrl = `https://v-locker.framekarts.com/${res.data.filePath}`;
+      const imageUrl = `https://api.vlocker.in/${res.data.filePath}`;
       onUpdate('WALLPAPER_URL', imageUrl);
     } catch (error) {
       console.error('Wallpaper upload error:', error);

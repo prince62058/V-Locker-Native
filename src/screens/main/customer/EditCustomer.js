@@ -27,6 +27,8 @@ import { updateCustomerThunk } from '../../../redux/slices/main/customerSlice';
 
 import { MEDIA_BASE_URL } from '../../../services/axios/api';
 
+const logo = require('../../../assets/images/VLOGO.png');
+
 const EditCustomer = ({ navigation }) => {
   const dispatch = useDispatch();
   const { customerProfile, loading } = useSelector(state => state.customer);
@@ -156,12 +158,10 @@ const EditCustomer = ({ navigation }) => {
             style={{ alignSelf: 'center', marginBottom: SIZES.height * 0.02 }}
           >
             <Pressable style={styles.profileImage} onPress={handleImageSelect}>
-              {form.profileUrl && (
-                <Image
-                  source={{ uri: getProfileUri() }}
-                  style={{ width: '100%', height: '100%', borderRadius: 100 }}
-                />
-              )}
+              <Image
+                source={getProfileUri() ? { uri: getProfileUri() } : logo}
+                style={{ width: '100%', height: '100%', borderRadius: 100 }}
+              />
             </Pressable>
             <Pressable style={styles.editView} onPress={handleImageSelect}>
               <Image source={icons.edit} style={styles.editIcon} />

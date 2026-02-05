@@ -2,16 +2,20 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { getSecureItem } from '../storage/keychain';
 
+// Production URL
 export const BASE_API_URL =
   Platform.OS === 'android'
-    ? 'https://v-locker.framekarts.com/api/'
-    : 'https://v-locker.framekarts.com/api/';
+    ? 'https://api.vlocker.in/api/'
+    : 'https://api.vlocker.in/api/';
+
+// Local URL (Uncomment when needed)
+// export const BASE_API_URL =
+//   Platform.OS === 'android'
+//     ? 'http://10.0.2.2:3000/api/'
+//     : 'http://localhost:3000/api/';
 
 const api = axios.create({
-  // Production URL - deployed backend
-  // baseURL: 'https://v-locker.framekarts.com/api/',
-
-  // Local Development URLs (uncomment for local testing)
+  // baseURL: 'https://api.vlocker.in/api/',
   baseURL: BASE_API_URL,
   timeout: 30 * 1000,
   headers: {
@@ -19,10 +23,17 @@ const api = axios.create({
   },
 });
 
+// Production Media URL
 export const MEDIA_BASE_URL =
   Platform.OS === 'android'
-    ? 'https://v-locker.framekarts.com'
-    : 'https://v-locker.framekarts.com';
+    ? 'https://api.vlocker.in'
+    : 'https://api.vlocker.in';
+
+// Local Media URL (Uncomment when needed)
+// export const MEDIA_BASE_URL =
+//   Platform.OS === 'android'
+//     ? 'http://10.0.2.2:3000'
+//     : 'http://localhost:3000';
 
 api.interceptors.request.use(
   async config => {
